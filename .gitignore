@@ -1,0 +1,28 @@
+--- Data and Features ---
+
+Exclude the entire data directory that contains the Mel Spectrograms
+
+colreg_features/
+!colreg_features/labels.npy # Keep the metadata file if it is small and essential
+
+--- ML Artifacts ---
+
+Exclude the trained model weights
+
+*.pth
+*.pt
+colreg_classifier_best.pth
+
+--- Environments ---
+
+venv/
+pycache/
+.env
+
+--- Docker & Logs ---
+
+*.log
+
+If you build the image locally, you typically don't ignore Docker files,
+
+but you might ignore output log directories.
