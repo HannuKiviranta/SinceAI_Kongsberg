@@ -5,6 +5,7 @@ Exclude the entire data directory that contains the Mel Spectrograms
 colreg_features/
 !colreg_features/labels.npy # Keep the metadata file if it is small and essential
 .DS_Store
+dataset/
 
 --- ML Artifacts ---
 

@@ -28,8 +28,9 @@ CLASS_MAP = {
     "Overtake_Port": 5,
     "Agreement_to_Overtake": 6,
     "Blind_Bend_Channel": 7,
-    "Noise_Only": 8,
-    "Random_Short_Blasts": 9
+    "Not_Under_Command": 8,
+    "Noise_Only": 9,
+    "Random_Short_Blasts": 10
 }
 
 # Helper dictionary to link file shorthand segments (like 'agree_overtake') to the canonical class name.
@@ -50,7 +51,10 @@ FILE_SEGMENT_TO_CLASS = {
     "round_starboard": "Blind_Bend_Channel", # Assuming these signals are a single prolonged blast (Rule 34(e))
     "round_port": "Blind_Bend_Channel",      # Same as above
     "making_way": "Blind_Bend_Channel",      # Assuming single prolonged blast (Rule 35(a) or Rule 34(e))
-    
+
+    # Not under command / I am unable to manoeuvre
+    "nuc": "Not_Under_Command",
+
     # Custom/Negative Classes
     "noise_only": "Noise_Only",
     "random_short_blasts": "Random_Short_Blasts",
