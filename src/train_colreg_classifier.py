@@ -200,7 +200,7 @@ def train_model(model, train_loader, val_loader, num_epochs=100, learning_rate=0
 if __name__ == '__main__':
     
     # 1. Setup paths
-    DATA_DIR = "colreg_features" # Directory containing labels.npy and the 'features' folder
+    DATA_DIR = "dataset/" # Directory containing labels.npy and the 'features' folder
     MODEL_FILE = "colreg_classifier_best.pth"
     
     # 2. Data Loading Check

@@ -1,3 +1,4 @@
+
 import librosa
 import numpy as np
 import soundfile as sf
@@ -8,8 +9,8 @@ import glob
 # --- CONFIGURATION ---
 SR = 22050
 OUTPUT_DIR = "dataset/train"
-HORNS_DIR = "assets/horns"          # Folder containing horn .wav files
-BACKGROUNDS_DIR = "assets/backgrounds" # Folder containing noise .wav files
+HORNS_DIR = "audio/horns"          # Folder containing horn .wav files
+BACKGROUNDS_DIR = "audio/noise/background_noise" # Folder containing noise .wav files
 SAMPLES_PER_CLASS = 50
 
 # --- RANDOMIZATION RANGES ---
