@@ -1,4 +1,3 @@
-
 import librosa
 import numpy as np
 import soundfile as sf
@@ -9,21 +8,28 @@ import glob
 # --- CONFIGURATION ---
 SR = 22050
 OUTPUT_DIR = "dataset/train"
-HORNS_DIR = "audio/horns"          # Folder containing horn .wav files
-BACKGROUNDS_DIR = "audio/noise/background_noise" # Folder containing noise .wav files
-WHITE_NOISE_DIR = "audio/noise/white_noise" # Folder containing white_noise .wav files
+HORNS_DIR = "audio/horns"          
+BACKGROUNDS_DIR = "audio/noise/background_noise" 
 SAMPLES_PER_CLASS = 50
 
 # --- RANDOMIZATION RANGES ---
 RANGE_SHORT = (0.7, 1.1)    
-RANGE_LONG = (4.5, 6.0)     
+RANGE_LONG = (4.0, 6.0)
 RANGE_INTERVAL = (0.8, 1.2) 
 RANGE_PAUSE = (2.0, 2.5)    
 
 def load_sound(path, duration=None):
-    """Loads audio. Returns (y, sr) but we discard sr since we force it."""
+    """Loads audio and TRIMS SILENCE to prevent looping gaps."""
     try:
         y, _ = librosa.load(path, sr=SR, duration=duration)
+        
+        # --- THE FIX IS HERE ---
+        # Trim leading and trailing silence below 20 decibels
+        y_trimmed, _ = librosa.effects.trim(y, top_db=20)
+        
+        # Safety check: if trim removes everything (silent file), use original
+        if len(y_trimmed) > 0:
+            return y_trimmed
         return y
     except Exception as e:
         print(f"Error loading {path}: {e}")
@@ -35,6 +41,14 @@ def get_random_duration(range_tuple):
 def create_blast(horn_raw, duration_sec):
     target_samples = int(duration_sec * SR)
     current_samples = len(horn_raw)
+    
+    # Fade out edges of the source horn to avoid "clicking" when looping
+    # (Optional simple cross-fade smoothing)
+    if current_samples > 100:
+        horn_raw[:50] = horn_raw[:50] * np.linspace(0, 1, 50)
+        horn_raw[-50:] = horn_raw[-50:] * np.linspace(1, 0, 50)
+
+    # Tile (repeat) horn 
     tiled = np.tile(horn_raw, int(np.ceil(target_samples / current_samples)))
     return tiled[:target_samples]
 
@@ -45,9 +59,15 @@ def generate_sample(filename, pattern_def, bg_noise, horn_raw):
     warmup_sec = random.uniform(0.5, 1.5)
     silence_samples = int(warmup_sec * SR)
     
-    max_start = len(bg_noise) - silence_samples
-    start_idx = np.random.randint(0, max_start) if max_start > 0 else 0
-    combined_audio = np.concatenate((combined_audio, bg_noise[start_idx : start_idx + silence_samples]))
+    # Safe background slicing
+    if len(bg_noise) > silence_samples:
+        max_start = len(bg_noise) - silence_samples
+        start_idx = np.random.randint(0, max_start)
+        combined_audio = np.concatenate((combined_audio, bg_noise[start_idx : start_idx + silence_samples]))
+    else:
+        # Fallback if background noise is shorter than requested silence
+        tiled_bg = np.tile(bg_noise, int(np.ceil(silence_samples/len(bg_noise))))
+        combined_audio = np.concatenate((combined_audio, tiled_bg[:silence_samples]))
 
     # 2. Build Pattern
     for sound_type, gap_type in pattern_def:
@@ -67,22 +87,27 @@ def generate_sample(filename, pattern_def, bg_noise, horn_raw):
             
         if gap_dur > 0:
             gap_samples = int(gap_dur * SR)
-            max_start = len(bg_noise) - gap_samples
-            start_idx = np.random.randint(0, max_start) if max_start > 0 else 0
-            noise_chunk = bg_noise[start_idx : start_idx + gap_samples]
             
-            if len(noise_chunk) < gap_samples:
-                noise_chunk = np.resize(noise_chunk, gap_samples)
+            if len(bg_noise) > gap_samples:
+                max_start = len(bg_noise) - gap_samples
+                start_idx = np.random.randint(0, max_start)
+                noise_chunk = bg_noise[start_idx : start_idx + gap_samples]
+            else:
+                tiled_bg = np.tile(bg_noise, int(np.ceil(gap_samples/len(bg_noise))))
+                noise_chunk = tiled_bg[:gap_samples]
+                
             combined_audio = np.concatenate((combined_audio, noise_chunk))
 
     # 3. Save
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+        
     path = f"{OUTPUT_DIR}/{filename}.wav"
     sf.write(path, combined_audio, SR)
 
 # --- HELPER: LOAD ALL ASSETS ---
 def load_asset_library(folder_path, duration=None):
     library = []
-    # Find all wav files in the folder
     files = glob.glob(os.path.join(folder_path, "*.wav"))
     print(f"Loading {len(files)} files from {folder_path}...")
     
@@ -98,20 +123,18 @@ def load_asset_library(folder_path, duration=None):
 # --- MAIN EXECUTION ---
 
 if __name__ == "__main__":
-    random.seed(42) # Optional: Keeps randomization reproducible
+    random.seed(42) 
     
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
 
-    # 1. Load all horns and backgrounds into memory
-    # Note: We load 60s of background to ensure we have enough variety for cuts
-    horns_library = load_asset_library(HORNS_DIR) 
+    # Load Libraries
+    # Note: Removing duration limit on horn to ensure we get the full blast for trimming
+    horns_library = load_asset_library(HORNS_DIR, duration=None) 
     backgrounds_library = load_asset_library(BACKGROUNDS_DIR, duration=60)
 
     print(f"Starting Generation: {SAMPLES_PER_CLASS} samples per class...")
 
-    # We define the scenarios map to keep the loop clean
-    # key = filename prefix, value = pattern list
     scenarios = {
         "01_starboard_turn":      [('short', 'none')],
         "02_port_turn":           [('short', 'interval'), ('short', 'none')],
@@ -132,8 +155,6 @@ if __name__ == "__main__":
         idx = f"{i+1:03d}"
         
         for prefix, pattern in scenarios.items():
-            # --- THE MAGIC: RANDOM SELECTION ---
-            # For every single file, pick a random horn and random background
             selected_horn = random.choice(horns_library)
             selected_bg = random.choice(backgrounds_library)
             
