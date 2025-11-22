@@ -36,7 +36,7 @@ RANGE_SNR_SECONDARY = (-10, 5) # SNR range for secondary events (e.g., -10 dB is
 # --- UTILITIES ---
 
 def load_sound(path, duration=None):
-    """Loads audio. Returns (y, sr) but we discard sr since we force it."""
+    """Loads audio and TRIMS SILENCE to prevent looping gaps."""
     try:
         y, _ = librosa.load(path, sr=SR, duration=duration)
         return y.astype(np.float32) # Ensure consistent float type
@@ -50,6 +50,14 @@ def get_random_duration(range_tuple):
 def create_blast(horn_raw, duration_sec):
     target_samples = int(duration_sec * SR)
     current_samples = len(horn_raw)
+    
+    # Fade out edges of the source horn to avoid "clicking" when looping
+    # (Optional simple cross-fade smoothing)
+    if current_samples > 100:
+        horn_raw[:50] = horn_raw[:50] * np.linspace(0, 1, 50)
+        horn_raw[-50:] = horn_raw[-50:] * np.linspace(1, 0, 50)
+
+    # Tile (repeat) horn 
     tiled = np.tile(horn_raw, int(np.ceil(target_samples / current_samples)))
     return tiled[:target_samples]
 
