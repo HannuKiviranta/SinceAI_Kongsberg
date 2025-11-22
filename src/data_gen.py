@@ -11,6 +11,7 @@ SR = 22050
 OUTPUT_DIR = "dataset/train"
 HORNS_DIR = "audio/horns"          # Folder containing horn .wav files
 BACKGROUNDS_DIR = "audio/noise/background_noise" # Folder containing noise .wav files
+WHITE_NOISE_DIR = "audio/noise/white_noise" # Folder containing white_noise .wav files
 SAMPLES_PER_CLASS = 50
 
 # --- RANDOMIZATION RANGES ---
