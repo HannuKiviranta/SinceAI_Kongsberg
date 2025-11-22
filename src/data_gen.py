@@ -16,9 +16,12 @@ HORNS_LONG_DIR = "audio/horns/long"
 # Define all noise categories
 NOISE_CATEGORIES = {
     "Backgrounds": "audio/noise/background_noise",
+<<<<<<< HEAD
     "BirdSounds": "audio/noise/bird_sounds", # Placeholder for new assets
     "Alarms": "audio/noise/alarms",          # Placeholder for new assets
     "OtherShips": "audio/horns",             # Using horns as another secondary event
+=======
+>>>>>>> 35871897217e485ee311ac36590b7b9fc977cb15
     "CalmSea": "audio/noise/calm_sea",
     "Thunderstorm": "audio/noise/thunderstorm"
 }
