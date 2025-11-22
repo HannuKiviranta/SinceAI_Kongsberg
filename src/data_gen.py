@@ -16,20 +16,20 @@ HORNS_LONG_DIR = "audio/horns/long"
 # Define all noise categories
 NOISE_CATEGORIES = {
     "Backgrounds": "audio/noise/background_noise",
-    #"BirdSounds": "audio/noise/bird_sounds", # Placeholder for new assets
-    #"Alarms": "audio/noise/alarms",          # Placeholder for new assets
-    #"OtherShips": "audio/horns",             # Using horns as another secondary event
     "CalmSea": "audio/noise/calm_sea",
     "Thunderstorm": "audio/noise/thunderstorm"
 }
 
-SAMPLES_PER_CLASS = 100
-SECONDARY_EVENT_PROBABILITY = 0.4 
+SAMPLES_PER_CLASS = 50
+# FIX 1: Reduced Secondary Event Probability
+SECONDARY_EVENT_PROBABILITY = 0.65 
 
 # --- TIMING CONFIGURATION ---
-RANGE_INTERVAL = (0.6, 1.2) 
-RANGE_PAUSE = (2.0, 2.5)
-RANGE_SNR_SECONDARY = (-10, 5) 
+# FIX 2: Widened timing variability ranges
+RANGE_INTERVAL = (0.5, 1.5) 
+RANGE_PAUSE = (1.5, 3.5)
+# FIX 3: Shifted SNR range to be less hostile
+RANGE_SNR_SECONDARY = (-5, 10) 
 
 # --- UTILITIES ---
 
@@ -63,6 +63,23 @@ def process_blast(blast_raw):
         
     return blast
 
+# FIX 4: Horn Augmentation function
+def augment_horn_blast(blast):
+    """Applies random pitch shift and time stretch to simulate new horn voices."""
+    
+    # Random Pitch Shift: between -2 and +2 semitones
+    n_steps = random.uniform(-2.0, 2.0)
+    blast = librosa.effects.pitch_shift(y=blast, sr=SR, n_steps=n_steps)
+    
+    # Random Time Stretch: between 0.8x and 1.2x speed
+    rate = random.uniform(0.8, 1.2)
+    # Note: time_stretch will change the length, which is handled naturally 
+    # when concatenating and padding in the main loop.
+    blast = librosa.effects.time_stretch(blast, rate=rate)
+    
+    return blast.astype(np.float32)
+
+
 # --- ASSET LOADING ---
 def load_asset_library(folder_paths, duration=None):
     library = []
@@ -93,7 +110,10 @@ def mix_audio_chunk(main_audio, secondary_audio, snr_db):
     scaling_factor = np.sqrt(target_noise_power / current_noise_power)
     
     mixed = main_audio + (secondary_audio * scaling_factor)
-    mixed = mixed / np.max(np.abs(mixed)) * 0.95 
+    # Final normalization to prevent clipping
+    max_abs = np.max(np.abs(mixed))
+    if max_abs > 0:
+        mixed = mixed / max_abs * 0.95 
     return mixed
 
 # --- MAIN GENERATOR FUNCTION ---
@@ -108,21 +128,24 @@ def generate_sample(filename, pattern_def, bg_noise, short_horns_list, long_horn
     start_idx = np.random.randint(0, max_start) if max_start > 0 else 0
     combined_audio = bg_noise[start_idx : start_idx + silence_samples].copy()
 
-    # --- FIX: Select Consistent Horns for this specific sample ---
-    # We pick ONE short horn and ONE long horn to use for the entire sequence.
-    # This ensures "NUC" (Long, Short, Short) uses the same "voice" for all blasts.
-    current_short_horn = random.choice(short_horns_list)
-    current_long_horn = random.choice(long_horns_list)
+    # --- FIX: Select and Augment Consistent Horns for this specific sample ---
+    # We pick ONE short horn and ONE long horn to use for the entire sequence, and augment them.
+    
+    # Base horn samples
+    base_short_horn = random.choice(short_horns_list)
+    base_long_horn = random.choice(long_horns_list)
+    
+    # Apply augmentation once for consistency across the sequence
+    current_short_horn = augment_horn_blast(base_short_horn)
+    current_long_horn = augment_horn_blast(base_long_horn)
 
     # 2. Build Pattern
     for sound_type, gap_type in pattern_def:
         
-        # --- A. ADD BLAST (Using Pre-selected Horns) ---
+        # --- A. ADD BLAST (Using Pre-selected and Augmented Horns) ---
         if sound_type == 'short':
-            # Use the consistent short horn chosen for this sample
             blast = process_blast(current_short_horn)
         elif sound_type == 'long':
-            # Use the consistent long horn chosen for this sample
             blast = process_blast(current_long_horn)
         
         combined_audio = np.concatenate((combined_audio, blast))
@@ -188,6 +211,10 @@ if __name__ == "__main__":
         short_horns_lib = load_asset_library(HORNS_SHORT_DIR)
         long_horns_lib = load_asset_library(HORNS_LONG_DIR)
         
+        # Basic check to ensure libraries loaded
+        if not short_horns_lib or not long_horns_lib:
+             raise ValueError("Horn libraries are empty.")
+        
         bg_path = NOISE_CATEGORIES['Backgrounds']
         backgrounds_lib = load_asset_library(bg_path, duration=60)
         
@@ -200,7 +227,7 @@ if __name__ == "__main__":
         exit(1)
 
     print(f"\nStarting Generation: {SAMPLES_PER_CLASS} samples per class...")
-    print(f"Stats: {len(short_horns_lib)} Short Horns, {len(long_horns_lib)} Long Horns")
+    print(f"Stats: {len(short_horns_lib)} Short Horns, {len(long_horns_lib)} Long Horns (Augmentation applied for variety)")
 
     scenarios = {
         "01_starboard_turn":      [('short', 'none')],

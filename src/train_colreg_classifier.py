@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+from torch.optim.lr_scheduler import ReduceLROnPlateau # Import scheduler
 import numpy as np
 import os
 import random
@@ -31,12 +32,7 @@ CLASS_NAMES = list(COLREG_CLASSES.keys())
 N_CLASSES = len(CLASS_NAMES)
 print(f"Defined {N_CLASSES} classification classes.")
 
-# --- 2. FEATURE GENERATION UTILITIES (Removed as requested) ---
-# All previous functions for synthesizing audio and computing features (generate_sine_wave, 
-# create_horn_blast, mix_signal_with_noise, generate_colreg_dataset_features) have been removed.
-# The script now relies solely on your existing data files.
-
-# --- 3. PYTORCH DATASET AND MODEL DEFINITION ---
+# --- 2. PYTORCH DATASET AND MODEL DEFINITION ---
 
 class ColregDataset(Dataset):
     """PyTorch Dataset for loading pre-computed 2D Mel Spectrogram features from .npy files."""
@@ -94,7 +90,8 @@ class ColregClassifier(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1)), # Drastically reduce frequency dim
             
-            nn.Dropout(0.3)
+            # FIX: Increased dropout for better regularization
+            nn.Dropout(0.4) 
         )
         
         # Calculate the size of the feature vector after CNN reduction
@@ -115,7 +112,8 @@ class ColregClassifier(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(128 * 2, 64), # 128 hidden * 2 directions (bidirectional)
             nn.ReLU(),
-            nn.Dropout(0.5),
+            # FIX: Increased dropout for better regularization
+            nn.Dropout(0.6),
             nn.Linear(64, num_classes)
         )
 
@@ -149,6 +147,15 @@ def train_model(model, train_loader, val_loader, num_epochs=100, learning_rate=0
     
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    
+    # FIX: Add Learning Rate Scheduler
+    scheduler = ReduceLROnPlateau(
+        optimizer, 
+        mode='max',      # Monitor validation accuracy (max is better)
+        factor=0.5,      # Reduce LR by 50%
+        patience=10,     # Wait 10 epochs for improvement
+        verbose=True
+    )
     
     print(f"\n--- Starting Training on {device} ---")
     
@@ -185,7 +192,10 @@ def train_model(model, train_loader, val_loader, num_epochs=100, learning_rate=0
 
         val_accuracy = 100 * correct / total
         
-        print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss:.4f} - Val Accuracy: {val_accuracy:.2f}%")
+        # Step the scheduler based on validation accuracy
+        scheduler.step(val_accuracy) 
+        
+        print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss:.4f} - Val Accuracy: {val_accuracy:.2f}% (LR: {optimizer.param_groups[0]['lr']:.6f})")
         
         # Save the best model
         if val_accuracy > best_accuracy:
