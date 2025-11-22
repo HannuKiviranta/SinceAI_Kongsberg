@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from torch.optim.lr_scheduler import ReduceLROnPlateau # Import scheduler
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
 import os
 import random
@@ -10,26 +10,28 @@ import random
 # --- 1. CONFIGURATION AND COLREG DEFINITIONS ---
 
 # ML Feature Constants
-N_MELS = 128                   # Number of Mel bands (Feature height) - MUST MATCH YOUR SAVED FEATURES
-# HOP_LENGTH = 512             # (Not needed for training, but kept for reference)
+N_MELS = 128                   
 
-# COLREG signal patterns (Used only for mapping class IDs to names)
+# COLREG signal patterns 
+# CRITICAL: This order MUST match CLASS_MAP in preprocess.py exactly (IDs 0 to 13)
 COLREG_CLASSES = {
-    "Alter Starboard":          ["S"],
-    "Alter Port":               ["S", "S"],
-    "Astern Propulsion":        ["S", "S", "S"],
-    "Danger Signal (Doubt)":    ["S", "S", "S", "S", "S"],
-    "Overtake Starboard":       ["L", "L", "S"],
-    "Overtake Port":            ["L", "L", "S", "S"],
-    "Agreement to Overtake":    ["L", "S", "L", "S"],
-    "Blind Bend / Narrow Channel": ["L"],
-    "Not Under Command":        ["L", "S", "S"],
-    # Negative examples
-    "Noise Only":               ["SILENCE"],
-    "Random Short Blasts":      ["S"] * 8, 
+    "Alter_Starboard":          ["S"],                  # ID 0
+    "Alter_Port":               ["S", "S"],             # ID 1
+    "Astern_Propulsion":        ["S", "S", "S"],        # ID 2
+    "Danger_Signal_Doubt":      ["S", "S", "S", "S", "S"], # ID 3
+    "Overtake_Starboard":       ["L", "L", "S"],        # ID 4
+    "Round_Starboard":          ["S", "S", "S", "S", "S"], # ID 5 
+    "Round_Port":               ["S", "S", "S", "S", "S", "S"], # ID 6
+    "Blind_Bend_Making_Way":    ["L"],                  # ID 7 
+    "Overtake_Port":            ["L", "L", "S", "S"],   # ID 8
+    "Agreement_to_Overtake":    ["L", "S", "L", "S"],   # ID 9
+    "Not_Under_Command":        ["L", "S", "S"],        # ID 10
+    "Noise_Only":               ["SILENCE"],            # ID 11
+    "Random_Short_Blasts":      ["S"] * 8,              # ID 12
 }
+
 CLASS_NAMES = list(COLREG_CLASSES.keys())
-N_CLASSES = len(CLASS_NAMES)
+N_CLASSES = len(CLASS_NAMES) # Should now be 14
 print(f"Defined {N_CLASSES} classification classes.")
 
 # --- 2. PYTORCH DATASET AND MODEL DEFINITION ---
@@ -46,34 +48,25 @@ class ColregDataset(Dataset):
         label_data = self.labels[idx]
         feature_path = label_data["filepath"]
         
-        # 1. Load Pre-computed 2D Feature Array (the "2D image")
-        # Feature array shape: (N_MELS, Time_Frames)
-        # Note: This loads the dB-scaled Mel Spectrogram array.
         try:
             mel_spectrogram_db = np.load(feature_path)
         except FileNotFoundError:
             print(f"Error: Feature file not found at {feature_path}. Check your labels.npy and data structure.")
             raise
         
-        # 2. Convert to PyTorch Tensor and add channel dimension
-        # Input shape required: (C, H, W) -> (1, N_MELS, Time_Frames)
         features = torch.tensor(mel_spectrogram_db).float().unsqueeze(0)
-        
-        # 3. Get Class Label
         label = torch.tensor(label_data["class_id"], dtype=torch.long)
         
         return features, label
 
 class ColregClassifier(nn.Module):
     """
-    CNN-GRU Model Architecture for Sequence Classification:
-    1. CNN (Spectral Feature Extraction): Learns horn timbre/pitch from frequency bands.
-    2. GRU (Temporal Pattern Recognition): Learns the sequence (S, S, S, L-S-L-S) over time.
+    CNN-GRU Model Architecture
     """
     def __init__(self, num_classes, input_height):
         super(ColregClassifier, self).__init__()
         
-        # 1. Convolutional Block (Time distributed feature extraction)
+        # 1. Convolutional Block 
         self.cnn = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=(3, 3), padding=1),
             nn.BatchNorm2d(16),
@@ -88,18 +81,16 @@ class ColregClassifier(nn.Module):
             nn.Conv2d(32, 64, kernel_size=(3, 3), padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1)), # Drastically reduce frequency dim
+            nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1)), 
             
-            # FIX: Increased dropout for better regularization
             nn.Dropout(0.4) 
         )
         
-        # Calculate the size of the feature vector after CNN reduction
         self.output_channels = 64
-        self.reduced_height = input_height // 2 // 2 // 4 # N_MELS / 16 (128/16 = 8)
+        self.reduced_height = input_height // 2 // 2 // 4 
         gru_input_size = self.output_channels * self.reduced_height 
 
-        # 2. Recurrent Block (Sequence Modeling)
+        # 2. Recurrent Block 
         self.gru = nn.GRU(
             input_size=gru_input_size,
             hidden_size=128,
@@ -110,31 +101,23 @@ class ColregClassifier(nn.Module):
 
         # 3. Output Classifier
         self.classifier = nn.Sequential(
-            nn.Linear(128 * 2, 64), # 128 hidden * 2 directions (bidirectional)
+            nn.Linear(128 * 2, 64), 
             nn.ReLU(),
-            # FIX: Increased dropout for better regularization
             nn.Dropout(0.6),
             nn.Linear(64, num_classes)
         )
 
     def forward(self, x):
-        # x shape: (Batch, 1, N_MELS, Time_Frames)
         cnn_out = self.cnn(x)
-        
-        # Prepare for GRU: Flatten (Channels * Height) dimension and swap Time dimension
-        # cnn_out shape: (B, C, H, T) -> (B, T, C*H)
         B, C, H, T = cnn_out.size()
         gru_input = cnn_out.permute(0, 3, 1, 2).contiguous().view(B, T, C * H)
         
-        # Pass through GRU
         gru_out, _ = self.gru(gru_input)
         
-        # Use the output from the last time step for classification
         last_forward = gru_out[:, -1, :128]
         last_backward = gru_out[:, 0, 128:]
         gru_output_combined = torch.cat((last_forward, last_backward), dim=1)
         
-        # Final classification layer
         logits = self.classifier(gru_output_combined)
         return logits
 
@@ -148,13 +131,11 @@ def train_model(model, train_loader, val_loader, num_epochs=100, learning_rate=0
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
-    # FIX: Add Learning Rate Scheduler
     scheduler = ReduceLROnPlateau(
         optimizer, 
-        mode='max',      # Monitor validation accuracy (max is better)
-        factor=0.5,      # Reduce LR by 50%
-        patience=10,     # Wait 10 epochs for improvement
-        verbose=True
+        mode='max',      
+        factor=0.5,      
+        patience=10
     )
     
     print(f"\n--- Starting Training on {device} ---")
@@ -195,7 +176,8 @@ def train_model(model, train_loader, val_loader, num_epochs=100, learning_rate=0
         # Step the scheduler based on validation accuracy
         scheduler.step(val_accuracy) 
         
-        print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss:.4f} - Val Accuracy: {val_accuracy:.2f}% (LR: {optimizer.param_groups[0]['lr']:.6f})")
+        current_lr = optimizer.param_groups[0]['lr']
+        print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss:.4f} - Val Accuracy: {val_accuracy:.2f}% (LR: {current_lr:.6f})")
         
         # Save the best model
         if val_accuracy > best_accuracy:
@@ -211,7 +193,7 @@ def train_model(model, train_loader, val_loader, num_epochs=100, learning_rate=0
 if __name__ == '__main__':
     
     # 1. Setup paths
-    DATA_DIR = "dataset/" # Directory containing labels.npy and the 'features' folder
+    DATA_DIR = "dataset/" 
     MODEL_FILE = "colreg_classifier_best.pth"
     
     # 2. Data Loading Check
@@ -219,7 +201,6 @@ if __name__ == '__main__':
     if not os.path.exists(labels_file):
         print("ERROR: Data metadata file not found!")
         print(f"Please ensure your data is located in '{DATA_DIR}' and that '{labels_file}' exists.")
-        print("The 'labels.npy' file must contain the list of dictionaries linking to your Mel Spectrogram .npy feature files.")
         exit(1)
     
     print("Loading existing 2D feature metadata from labels.npy.")

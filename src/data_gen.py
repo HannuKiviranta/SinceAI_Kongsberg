@@ -229,10 +229,8 @@ if __name__ == "__main__":
         "09_overtake_starboard":  [('long', 'interval'), ('long', 'interval'), ('short', 'none')],
         "10_overtake_port":       [('long', 'interval'), ('long', 'interval'), ('short', 'interval'), ('short', 'none')],
         "11_agree_overtake":      [('long', 'interval'), ('short', 'interval'), ('long', 'interval'), ('short', 'none')],
-        
-        # FIX 5: Correct "No Signal" definition
-        # We chain multiple 'none' events with 'pause' gaps to create ~10 seconds of pure noise
-        "12_no_signal":           [('none', 'pause'), ('none', 'pause'), ('none', 'pause'), ('none', 'pause')]
+        "12_no_signal":           [('none', 'pause'), ('none', 'pause'), ('none', 'pause'), ('none', 'pause')],
+        "13_random_short":        [('short', 'interval')] * 8
     }
 
     total_files = 0
