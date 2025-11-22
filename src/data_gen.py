@@ -21,6 +21,8 @@ NOISE_CATEGORIES = {
     "BirdSounds": "audio/noise/bird_sounds", # Placeholder for new assets
     "Alarms": "audio/noise/alarms",          # Placeholder for new assets
     "OtherShips": "audio/horns",             # Using horns as another secondary event
+    "CalmSea": "audio/noise/calm_sea",
+    "Thunderstorm": "audio/noise/thunderstorm"
 }
 
 SAMPLES_PER_CLASS = 50
