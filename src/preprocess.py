@@ -5,7 +5,7 @@ import glob
 import re
 
 # --- CONFIGURATION (MUST MATCH TRAINING SCRIPT) ---
-SR = 16000                     # Sample rate
+SR = 22050                     # Sample rate
 CLIP_DURATION_SEC = 10         # Fixed duration of clips
 N_MELS = 128                   # Number of Mel bands (Feature height)
 HOP_LENGTH = 512               # Time resolution

@@ -22,6 +22,7 @@ COLREG_CLASSES = {
     "Overtake Port":            ["L", "L", "S", "S"],
     "Agreement to Overtake":    ["L", "S", "L", "S"],
     "Blind Bend / Narrow Channel": ["L"],
+    "Not Under Command":        ["L", "S", "S"],
     # Negative examples
     "Noise Only":               ["SILENCE"],
     "Random Short Blasts":      ["S"] * 8, 
