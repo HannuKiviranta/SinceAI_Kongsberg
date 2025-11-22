@@ -1,0 +1,10 @@
+Core ML Framework  
+torch  
+  
+Audio Processing and Feature Extraction  
+  
+librosa  
+numpy  
+soundfile # Used for writing WAV files in the generator  
+scipy  
+matplotlib # Optional, but often required by librosa/spectrogram display tools  
