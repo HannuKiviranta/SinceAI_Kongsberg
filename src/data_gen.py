@@ -15,18 +15,19 @@ HORNS_LONG_DIR = "audio/horns/long"
 
 # Define all noise categories
 NOISE_CATEGORIES = {
-    "BirdSounds": "audio/noise/bird_sounds", # Placeholder for new assets
-    "Alarms": "audio/noise/alarms",          # Placeholder for new assets
-    "OtherShips": "audio/horns",             # Using horns as another secondary event
+    "Backgrounds": "audio/noise/background_noise",
+    #"BirdSounds": "audio/noise/bird_sounds", # Placeholder for new assets
+    #"Alarms": "audio/noise/alarms",          # Placeholder for new assets
+    #"OtherShips": "audio/horns",             # Using horns as another secondary event
     "CalmSea": "audio/noise/calm_sea",
     "Thunderstorm": "audio/noise/thunderstorm"
 }
 
-SAMPLES_PER_CLASS = 50
-SECONDARY_EVENT_PROBABILITY = 0.3 
+SAMPLES_PER_CLASS = 100
+SECONDARY_EVENT_PROBABILITY = 0.4 
 
 # --- TIMING CONFIGURATION ---
-RANGE_INTERVAL = (0.8, 1.2) 
+RANGE_INTERVAL = (0.6, 1.2) 
 RANGE_PAUSE = (2.0, 2.5)
 RANGE_SNR_SECONDARY = (-10, 5) 
 

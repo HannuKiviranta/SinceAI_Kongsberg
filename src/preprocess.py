@@ -123,7 +123,6 @@ if __name__ == "__main__":
     
     # Find all wav files directly in the source folder (flat structure)
     wav_files = glob.glob(os.path.join(SOURCE_FOLDER, "*.wav"))
-    wav_files.extend(glob.glob(os.path.join(SOURCE_FOLDER, "*.WAV"))) # Also check for uppercase extension
 
     print(f"Found {len(wav_files)} files to process...")
 
