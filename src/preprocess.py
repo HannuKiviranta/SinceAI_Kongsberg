@@ -2,7 +2,6 @@ import librosa
 import numpy as np
 import os
 import glob
-import re
 
 # --- CONFIGURATION ---
 SR = 22050                     
@@ -11,7 +10,7 @@ N_MELS = 128
 HOP_LENGTH = 512               
 MAX_WIDTH = int(np.ceil(CLIP_DURATION_SEC * (SR / HOP_LENGTH))) 
 
-SOURCE_FOLDER = "dataset/train"      
+SOURCE_FOLDER = "dataset/train/clean"      
 OUTPUT_DIR = "dataset"         
 FEATURES_SUBDIR = "features"           
 
