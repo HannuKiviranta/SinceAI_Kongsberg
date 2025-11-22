@@ -18,17 +18,17 @@ RUN apt-get update && \
 COPY deployment/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3. Copy all source code (Generator and Trainer)
-# We assume source files are in the local 'src/' directory
+# 3. Copy all source code (Generator, Preprocessor, and Trainer)
+# We copy them into the correct folder structure (/app/src/)
+RUN mkdir -p src/
 COPY src/train_colreg_classifier.py src/
-# If you run the generator in the container:
-COPY src/generate_colreg_audio.py src/
+COPY src/data_gen.py src/       # <-- Data Generator
+COPY src/preprocess.py src/     # <-- Feature Extractor
 
-# 4. Create the required data mount points
-# These directories will be volume-mounted from the host machine
-RUN mkdir -p colreg_features
-# If you decide to generate audio inside Docker:
-# RUN mkdir -p raw_audio_input 
+# 4. Create the required data mount point
+# This directory MUST match the mount point you use in the 'docker run' command.
+# It aligns with your host directory structure (dataset/ features, train, labels.npy)
+RUN mkdir -p dataset
 
-# Set the default command to guide the user (but this will be overridden by the run command)
+# Set the default command to run the training script
 CMD ["python", "src/train_colreg_classifier.py"]
