@@ -14,16 +14,17 @@ MODEL_PATH = "colreg_classifier/colreg_classifier_best.pth"
 
 # Class mapping (Must be in the exact same order as training)
 COLREG_CLASSES = [
-    "Alter Starboard",          # 0
-    "Alter Port",               # 1
-    "Astern Propulsion",        # 2
-    "Danger Signal (Doubt)",    # 3
-    "Overtake Starboard",       # 4
-    "Overtake Port",            # 5
-    "Agreement to Overtake",    # 6
-    "Blind Bend / Narrow Channel", # 7
-    "Noise Only",               # 8
-    "Random Short Blasts"       # 9
+    "Alter_Starboard",          # 0
+    "Alter_Port",               # 1
+    "Astern_Propulsion",        # 2
+    "Danger_Signal_Doubt",    # 3
+    "Overtake_Starboard",       # 4
+    "Overtake_Port",            # 5
+    "Agreement_to_Overtake",    # 6
+    "Blind_Bend_Channel", # 7
+    "Not_Under_Command",        #8
+    "Noise_Only",               # 9
+    "Random_Short_Blasts"       # 10
 ]
 
 # --- 2. MODEL ARCHITECTURE ---
