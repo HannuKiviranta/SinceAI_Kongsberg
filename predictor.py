@@ -7,12 +7,17 @@ import os
 import sys
 
 # --- 1. CONFIGURATION ---
-# These MUST match the training settings exactly
 N_MELS = 128
-MAX_WIDTH = 860  # Approx 20 seconds of audio at sr=22050, hop=512
+SR = 22050
+HOP_LENGTH = 512
+CLIP_DURATION_SEC = 20 # UPDATED: Set to 20 to match your new training data
+
+# Calculate width dynamically so it is ALWAYS correct (862 pixels for 20s)
+MAX_WIDTH = int(np.ceil(CLIP_DURATION_SEC * (SR / HOP_LENGTH)))
+
 MODEL_PATH = "colreg_classifier/colreg_classifier_best.pth"
 
-# Class mapping (Must be in the exact same order as training)
+# Class mapping (13 Classes)
 COLREG_CLASSES = [
     "Alter Starboard",          # 0
     "Alter Port",               # 1
@@ -30,12 +35,10 @@ COLREG_CLASSES = [
 ]
 
 # --- 2. MODEL ARCHITECTURE ---
-# This class must be identical to the one used in training
 class ColregClassifier(nn.Module):
     def __init__(self, num_classes, input_height):
         super(ColregClassifier, self).__init__()
         
-        # 1. Convolutional Block
         self.cnn = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=(3, 3), padding=1),
             nn.BatchNorm2d(16), nn.ReLU(),
@@ -51,12 +54,10 @@ class ColregClassifier(nn.Module):
             nn.Dropout(0.3)
         )
         
-        # Calculate hidden sizes
         self.output_channels = 64
         self.reduced_height = input_height // 2 // 2 // 4 
         gru_input_size = self.output_channels * self.reduced_height 
 
-        # 2. Recurrent Block
         self.gru = nn.GRU(
             input_size=gru_input_size,
             hidden_size=128,
@@ -65,7 +66,6 @@ class ColregClassifier(nn.Module):
             bidirectional=True
         )
 
-        # 3. Classifier
         self.classifier = nn.Sequential(
             nn.Linear(128 * 2, 64),
             nn.ReLU(),
@@ -76,40 +76,40 @@ class ColregClassifier(nn.Module):
     def forward(self, x):
         cnn_out = self.cnn(x)
         B, C, H, T = cnn_out.size()
-        
-        # Prepare for GRU
         gru_input = cnn_out.permute(0, 3, 1, 2).contiguous().view(B, T, C * H)
         gru_out, _ = self.gru(gru_input)
-        
-        # Get last state
         last_forward = gru_out[:, -1, :128]
         last_backward = gru_out[:, 0, 128:]
         gru_output_combined = torch.cat((last_forward, last_backward), dim=1)
-        
         return self.classifier(gru_output_combined)
 
 # --- 3. PREPROCESSING UTILS ---
 def preprocess_audio(file_path):
     """Loads wav, converts to mel spectrogram, pads to correct size, returns Tensor."""
     try:
-        # Load audio
-        y, sr = librosa.load(file_path, sr=22050)
+        y, sr = librosa.load(file_path, sr=SR)
         
-        # Convert to Mel Spectrogram
-        mels = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=N_MELS, fmax=8000)
+        # 1. Time-Domain Padding (Matches preprocess.py logic)
+        target_samples = int(SR * CLIP_DURATION_SEC)
+        if len(y) < target_samples:
+            y = np.pad(y, (0, target_samples - len(y)), 'constant')
+        elif len(y) > target_samples:
+            y = y[:target_samples]
+
+        # 2. Mel Spectrogram (Matches preprocess.py parameters)
+        # Removed fmax=8000 because training didn't use it
+        # Added hop_length=HOP_LENGTH
+        mels = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=N_MELS, hop_length=HOP_LENGTH)
         mels_db = librosa.power_to_db(mels, ref=np.max)
         
-        # Pad or Crop to MAX_WIDTH
+        # 3. Spectrogram Width Safety Check
         current_width = mels_db.shape[1]
         if current_width < MAX_WIDTH:
-            # Pad with silence (-80dB)
             padding = MAX_WIDTH - current_width
             mels_db = np.pad(mels_db, ((0, 0), (0, padding)), mode='constant', constant_values=-80)
-        else:
-            # Crop
+        elif current_width > MAX_WIDTH:
             mels_db = mels_db[:, :MAX_WIDTH]
             
-        # Create Tensor: (Batch=1, Channel=1, Height, Width)
         tensor = torch.tensor(mels_db).float().unsqueeze(0).unsqueeze(0)
         return tensor
         
@@ -119,19 +119,15 @@ def preprocess_audio(file_path):
 
 # --- 4. MAIN EXECUTION ---
 if __name__ == "__main__":
-    # Argument Parser
     parser = argparse.ArgumentParser(description="COLREG Sound Signal Classifier")
     parser.add_argument("--file", type=str, required=True, help="Path to the .wav file to test")
     parser.add_argument("--model", type=str, default=MODEL_PATH, help="Path to .pth model file")
     args = parser.parse_args()
 
-    # 1. Check Model Path
     if not os.path.exists(args.model):
         print(f"ERROR: Model not found at {args.model}")
-        print("Please train the model or adjust the path.")
         sys.exit(1)
 
-    # 2. Load Model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Loading model from {args.model} on {device}...")
     
@@ -139,12 +135,11 @@ if __name__ == "__main__":
         model = ColregClassifier(num_classes=len(COLREG_CLASSES), input_height=N_MELS)
         model.load_state_dict(torch.load(args.model, map_location=device))
         model.to(device)
-        model.eval() # Important: Set to evaluation mode (disables dropout)
+        model.eval() 
     except Exception as e:
-        print(f"Failed to load model architecture: {e}")
+        print(f"Failed to load model: {e}")
         sys.exit(1)
 
-    # 3. Preprocess Audio
     print(f"Processing audio file: {args.file}")
     if not os.path.exists(args.file):
         print("ERROR: Audio file not found.")
@@ -155,21 +150,15 @@ if __name__ == "__main__":
     if input_tensor is None:
         sys.exit(1)
 
-    # 4. Inference
     input_tensor = input_tensor.to(device)
     
-    with torch.no_grad(): # No need to calculate gradients for inference
+    with torch.no_grad():
         outputs = model(input_tensor)
-        
-        # Convert logits to probabilities
         probabilities = torch.nn.functional.softmax(outputs, dim=1)
-        
-        # Get the highest probability class
         score, predicted_idx = torch.max(probabilities, 1)
         predicted_class = COLREG_CLASSES[predicted_idx.item()]
         confidence = score.item() * 100
 
-    # 5. Output Results
     print("\n" + "="*40)
     print(f"PREDICTION RESULT")
     print("="*40)
@@ -177,9 +166,7 @@ if __name__ == "__main__":
     print(f"Confidence:       {confidence:.2f}%")
     print("-" * 40)
     
-    # Optional: Warning for low confidence
     if confidence < 70.0:
         print("WARNING: Confidence is low. Result may be unreliable.")
-        print("Possible causes: Background noise too high, or unknown signal.")
     
     print("="*40 + "\n")

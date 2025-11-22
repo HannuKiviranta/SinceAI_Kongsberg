@@ -168,3 +168,31 @@ You can adjust training parameters in `src/data_gen.py` and `src/train_colreg_cl
 ## 📜 License
 
 This project is open-source. Please attribute the contributors if used in production or academic work.
+
+
+Mac / Linux:
+
+Bash
+
+docker run --rm \
+  -v "$(pwd)/audio:/app/audio" \
+  -v "$(pwd)/models:/app/models" \
+  colreg-full
+
+Windows (PowerShell):
+
+PowerShell
+
+docker run --rm \
+  -v "$(pwd)/audio:/app/audio" \
+  -v "$(pwd)/models:/app/models" \
+  colreg-full
+
+
+Run the test:
+docker run --rm \
+  -v "$(pwd)/models:/app/models" \
+  -v "$(pwd)/test_samples/low_noise/10_overtake_on_port_side.wav:/app/input.wav" \
+  --entrypoint python \
+  colreg-clean \
+  predictor.py --file /app/input.wav --model /app/models/colreg_classifier_clean.pth

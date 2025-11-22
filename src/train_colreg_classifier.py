@@ -7,37 +7,12 @@ import numpy as np
 import os
 import random
 
-# --- 1. CONFIGURATION AND COLREG DEFINITIONS ---
-
-# ML Feature Constants
+# --- CONFIGURATION ---
 N_MELS = 128                   
+N_CLASSES = 13 
 
-# COLREG signal patterns 
-# CRITICAL: This order MUST match CLASS_MAP in preprocess.py exactly (IDs 0 to 13)
-COLREG_CLASSES = {
-    "Alter_Starboard":          ["S"],                  # ID 0
-    "Alter_Port":               ["S", "S"],             # ID 1
-    "Astern_Propulsion":        ["S", "S", "S"],        # ID 2
-    "Danger_Signal_Doubt":      ["S", "S", "S", "S", "S"], # ID 3
-    "Overtake_Starboard":       ["L", "L", "S"],        # ID 4
-    "Round_Starboard":          ["S", "S", "S", "S", "S"], # ID 5 
-    "Round_Port":               ["S", "S", "S", "S", "S", "S"], # ID 6
-    "Blind_Bend_Making_Way":    ["L"],                  # ID 7 
-    "Overtake_Port":            ["L", "L", "S", "S"],   # ID 8
-    "Agreement_to_Overtake":    ["L", "S", "L", "S"],   # ID 9
-    "Not_Under_Command":        ["L", "S", "S"],        # ID 10
-    "Noise_Only":               ["SILENCE"],            # ID 11
-    "Random_Short_Blasts":      ["S"] * 8,              # ID 12
-}
-
-CLASS_NAMES = list(COLREG_CLASSES.keys())
-N_CLASSES = len(CLASS_NAMES) # Should now be 14
-print(f"Defined {N_CLASSES} classification classes.")
-
-# --- 2. PYTORCH DATASET AND MODEL DEFINITION ---
-
+# --- DATASET DEFINITION ---
 class ColregDataset(Dataset):
-    """PyTorch Dataset for loading pre-computed 2D Mel Spectrogram features from .npy files."""
     def __init__(self, labels_list):
         self.labels = labels_list
 
@@ -51,46 +26,42 @@ class ColregDataset(Dataset):
         try:
             mel_spectrogram_db = np.load(feature_path)
         except FileNotFoundError:
-            print(f"Error: Feature file not found at {feature_path}. Check your labels.npy and data structure.")
+            print(f"Error: Feature file not found at {feature_path}")
             raise
         
+        # Convert to Tensor (1 Channel, Height, Width)
         features = torch.tensor(mel_spectrogram_db).float().unsqueeze(0)
         label = torch.tensor(label_data["class_id"], dtype=torch.long)
         
         return features, label
 
+# --- MODEL ARCHITECTURE (CNN + GRU) ---
 class ColregClassifier(nn.Module):
-    """
-    CNN-GRU Model Architecture
-    """
     def __init__(self, num_classes, input_height):
         super(ColregClassifier, self).__init__()
         
-        # 1. Convolutional Block 
+        # 1. CNN Block (Extracts Frequency Features)
         self.cnn = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=(3, 3), padding=1),
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
+            nn.BatchNorm2d(16), nn.ReLU(),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
             
             nn.Conv2d(16, 32, kernel_size=(3, 3), padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
+            nn.BatchNorm2d(32), nn.ReLU(),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
             
             nn.Conv2d(32, 64, kernel_size=(3, 3), padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
+            nn.BatchNorm2d(64), nn.ReLU(),
             nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1)), 
-            
-            nn.Dropout(0.4) 
+            nn.Dropout(0.4)
         )
         
+        # Calculate flatten size for GRU input
         self.output_channels = 64
         self.reduced_height = input_height // 2 // 2 // 4 
         gru_input_size = self.output_channels * self.reduced_height 
 
-        # 2. Recurrent Block 
+        # 2. GRU Block (Extracts Time Sequence Features)
         self.gru = nn.GRU(
             input_size=gru_input_size,
             hidden_size=128,
@@ -99,49 +70,84 @@ class ColregClassifier(nn.Module):
             bidirectional=True
         )
 
-        # 3. Output Classifier
+        # 3. Classifier Block
         self.classifier = nn.Sequential(
-            nn.Linear(128 * 2, 64), 
+            nn.Linear(128 * 2, 64), # Bidirectional = 2 * hidden_size
             nn.ReLU(),
-            nn.Dropout(0.6),
+            nn.Dropout(0.5),
             nn.Linear(64, num_classes)
         )
 
     def forward(self, x):
+        # CNN Forward
         cnn_out = self.cnn(x)
+        
+        # Prepare for GRU: (Batch, Channels, Freq, Time) -> (Batch, Time, Features)
         B, C, H, T = cnn_out.size()
         gru_input = cnn_out.permute(0, 3, 1, 2).contiguous().view(B, T, C * H)
         
+        # GRU Forward
         gru_out, _ = self.gru(gru_input)
         
+        # Take last hidden state (Forward + Backward)
         last_forward = gru_out[:, -1, :128]
         last_backward = gru_out[:, 0, 128:]
         gru_output_combined = torch.cat((last_forward, last_backward), dim=1)
         
-        logits = self.classifier(gru_output_combined)
-        return logits
+        return self.classifier(gru_output_combined)
 
-
-def train_model(model, train_loader, val_loader, num_epochs=100, learning_rate=0.001, model_path="colreg_model.pth"):
-    """Main function to train and evaluate the PyTorch model."""
+# --- TRAINING ENGINE ---
+def run_training_phase(phase_name, labels_file, model, num_epochs, lr, save_path, load_path=None):
+    """
+    Runs a complete training session (Phase).
+    Can optionally load weights from a previous phase (Fine-Tuning).
+    """
+    print(f"\n" + "="*50)
+    print(f"🚀 STARTING PHASE: {phase_name.upper()}")
+    print(f"="*50)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     
+    # 1. Load Previous Weights (if requested)
+    if load_path:
+        if os.path.exists(load_path):
+            print(f"🔄 Loading weights from previous phase: {load_path}")
+            try:
+                model.load_state_dict(torch.load(load_path, map_location=device))
+                print("✅ Weights loaded successfully. Fine-tuning...")
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to load weights ({e}). Starting fresh.")
+        else:
+            print(f"⚠️ Previous model {load_path} not found. Starting fresh.")
+    
+    # 2. Load Data Labels
+    if not os.path.exists(labels_file):
+        print(f"❌ Skipping Phase '{phase_name}': Metadata file '{labels_file}' not found.")
+        return
+
+    print(f"📂 Loading data from: {labels_file}")
+    all_labels = np.load(labels_file, allow_pickle=True)
+    random.shuffle(all_labels)
+    
+    # Split 80/20
+    split_idx = int(0.8 * len(all_labels))
+    train_labels = all_labels[:split_idx]
+    val_labels = all_labels[split_idx:]
+    
+    print(f"   Training Samples: {len(train_labels)} | Validation Samples: {len(val_labels)}")
+    
+    train_loader = DataLoader(ColregDataset(train_labels), batch_size=32, shuffle=True)
+    val_loader = DataLoader(ColregDataset(val_labels), batch_size=32, shuffle=False)
+    
+    # 3. Setup Optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    
-    scheduler = ReduceLROnPlateau(
-        optimizer, 
-        mode='max',      
-        factor=0.5,      
-        patience=10
-    )
-    
-    print(f"\n--- Starting Training on {device} ---")
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
     
     best_accuracy = 0.0
     
+    # 4. Training Loop
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -159,7 +165,7 @@ def train_model(model, train_loader, val_loader, num_epochs=100, learning_rate=0
         
         epoch_loss = running_loss / len(train_loader.dataset)
         
-        # Validation step
+        # Validation
         model.eval()
         correct = 0
         total = 0
@@ -172,66 +178,64 @@ def train_model(model, train_loader, val_loader, num_epochs=100, learning_rate=0
                 correct += (predicted == labels).sum().item()
 
         val_accuracy = 100 * correct / total
-        
-        # Step the scheduler based on validation accuracy
-        scheduler.step(val_accuracy) 
+        scheduler.step(val_accuracy)
         
         current_lr = optimizer.param_groups[0]['lr']
-        print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss:.4f} - Val Accuracy: {val_accuracy:.2f}% (LR: {current_lr:.6f})")
+        print(f"[{phase_name}] Epoch {epoch+1}/{num_epochs} | Loss: {epoch_loss:.4f} | Val Acc: {val_accuracy:.2f}% (LR: {current_lr:.6f})")
         
-        # Save the best model
+        # Save Best
         if val_accuracy > best_accuracy:
             best_accuracy = val_accuracy
-            torch.save(model.state_dict(), model_path)
-            print(f"Model saved to {model_path} with improved accuracy: {best_accuracy:.2f}%")
+            torch.save(model.state_dict(), save_path)
+    
+    print(f"✅ Phase '{phase_name}' Complete. Best Accuracy: {best_accuracy:.2f}%")
+    print(f"💾 Model saved to: {save_path}")
 
-    print("\n--- Training Complete ---")
-    print(f"Best validation accuracy: {best_accuracy:.2f}%")
-    print(f"Final model saved to {model_path}")
-
-
+# --- MAIN EXECUTION ---
 if __name__ == '__main__':
     
-    # 1. Setup paths
+    # Define Paths
     DATA_DIR = "dataset/" 
-    MODEL_FILE = "colreg_classifier_best.pth"
+    LABELS_CLEAN = os.path.join(DATA_DIR, "labels_clean.npy")
+    LABELS_NOISY = os.path.join(DATA_DIR, "labels_noisy.npy")
     
-    # 2. Data Loading Check
-    labels_file = os.path.join(DATA_DIR, "labels.npy")
-    if not os.path.exists(labels_file):
-        print("ERROR: Data metadata file not found!")
-        print(f"Please ensure your data is located in '{DATA_DIR}' and that '{labels_file}' exists.")
-        exit(1)
+    # Intermediate model (after clean training)
+    MODEL_CLEAN = "colreg_model_clean.pth"
+    # Final model (after noisy training)
+    MODEL_FINAL = "colreg_classifier_best.pth"
     
-    print("Loading existing 2D feature metadata from labels.npy.")
-    all_labels = np.load(labels_file, allow_pickle=True)
-
-    # 3. Split Data
-    random.shuffle(all_labels)
-    split_idx = int(0.8 * len(all_labels))
-    train_labels = all_labels[:split_idx]
-    val_labels = all_labels[split_idx:]
-
-    # 4. Create DataLoaders
-    train_dataset = ColregDataset(train_labels)
-    val_dataset = ColregDataset(val_labels)
-    
-    BATCH_SIZE = 32
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    
-    print(f"Total samples: {len(all_labels)}. Training on {len(train_labels)}, Validating on {len(val_labels)}.")
-
-    # 5. Initialize Model and Start Training
+    # Initialize Architecture
     model = ColregClassifier(num_classes=N_CLASSES, input_height=N_MELS)
-    train_model(
-        model, 
-        train_loader, 
-        val_loader, 
-        num_epochs=100, 
-        learning_rate=0.001,
-        model_path=MODEL_FILE
+
+    # --- PHASE 1: CLEAN TRAINING (Curriculum Start) ---
+    # Higher Learning Rate (0.001), More Epochs (30)
+    run_training_phase(
+        phase_name="Clean",
+        labels_file=LABELS_CLEAN,
+        model=model,
+        num_epochs=35, 
+        lr=0.001,
+        save_path=MODEL_CLEAN,
+        load_path=None # Start from scratch
     )
 
-    print("\n--- Next Steps ---")
-    print(f"Use the saved model file ({MODEL_FILE}) in a separate inference script (predict.py) inside your Docker container for deployment.")
+    # --- PHASE 2: NOISY FINE-TUNING (Curriculum Advanced) ---
+    # Lower Learning Rate (0.0001) to preserve knowledge, fewer epochs (20)
+    # Only runs if labels_noisy.npy exists
+    run_training_phase(
+        phase_name="Noisy",
+        labels_file=LABELS_NOISY,
+        model=model,
+        num_epochs=20, 
+        lr=0.0001, 
+        save_path=MODEL_FINAL,
+        load_path=MODEL_CLEAN # Load weights from Phase 1
+    )
+    
+    # Fallback: If Phase 2 didn't run (no noisy data), ensure we still have a "best" model file
+    if not os.path.exists(MODEL_FINAL) and os.path.exists(MODEL_CLEAN):
+        print("\n⚠️ No noisy training performed. Using Clean model as Final model.")
+        import shutil
+        shutil.copy(MODEL_CLEAN, MODEL_FINAL)
+    
+    print(f"\n🎉 Full Curriculum Training Workflow Complete!")

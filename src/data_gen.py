@@ -4,58 +4,37 @@ import soundfile as sf
 import os
 import random
 import glob
+import argparse
 
-# --- MASTER CONFIGURATION ---
-# TOGGLE THIS SWITCH:
-# False = Phase 1 (Clean data, no noise, stored in dataset/train/clean)
-# True  = Phase 2 (Noisy data, wind/sea mixed in, stored in dataset/train/noisy)
-USE_BACKGROUND_NOISE = True 
-
+# --- CONFIGURATION ---
 SR = 22050 
-
-# --- DYNAMIC OUTPUT PATH ---
-# This separates your datasets automatically so they don't get mixed up.
-if USE_BACKGROUND_NOISE:
-    OUTPUT_DIR = "dataset/train/noisy"
-    print(f"⚠️  MODE: NOISY GENERATION -> Saving to {OUTPUT_DIR}")
-else:
-    OUTPUT_DIR = "dataset/train/clean"
-    print(f"✅  MODE: CLEAN GENERATION -> Saving to {OUTPUT_DIR}")
+OUTPUT_DIR_BASE = "dataset/train"
 
 # Source Folders
 HORNS_SHORT_DIR = "audio/horns/short"
 HORNS_LONG_DIR = "audio/horns/long"
 
-# Noise Categories
+# Noise Categories (SIMPLIFIED)
+# We only keep the continuous background noise (Wind/Sea)
 NOISE_CATEGORIES = {
-    "Backgrounds": "audio/noise/background_noise",
-    "CalmSea": "audio/noise/calm_sea",
-    "Thunderstorm": "audio/noise/thunderstorm",
-    "BirdSounds": "audio/noise/bird_sounds",
-    "Alarms": "audio/noise/alarms",
-    "WhiteNoise": "audio/noise/white_noise"
+    "Backgrounds": "audio/noise/background_noise"
 }
 
-# Increased to 500 for better training results (Total ~6,500 files)
-SAMPLES_PER_CLASS = 10 
-SECONDARY_EVENT_PROBABILITY = 0.65 if USE_BACKGROUND_NOISE else 0
+SAMPLES_PER_CLASS = 10 # Increased to 1000 for robust training
 
-# --- TIMING CONFIGURATION ---
-RANGE_INTERVAL = (0.5, 1.5) 
-RANGE_PAUSE = (1.5, 3.5)
-RANGE_SNR_SECONDARY = (-5, 10) 
+# --- TIMING CONFIGURATION (UPDATED) ---
+RANGE_INTERVAL = (0.7, 1.1)   # ~1.0s gap
+RANGE_PAUSE = (2.6, 3.2)      # ~3.0s gap for compound signals
+RANGE_SNR_SECONDARY = (0, 10) # 0dB to 10dB (Fairly loud noise, but not overwhelming)
 
 # --- UTILITIES ---
-
 def load_sound(path, duration=None):
     try:
         y, _ = librosa.load(path, sr=SR, duration=duration)
         y_trimmed, _ = librosa.effects.trim(y, top_db=20)
-        if len(y_trimmed) > 0:
-            return y_trimmed.astype(np.float32)
+        if len(y_trimmed) > 0: return y_trimmed.astype(np.float32)
         return y.astype(np.float32)
-    except Exception as e:
-        return None
+    except Exception as e: return None
 
 def get_random_duration(range_tuple):
     return random.uniform(range_tuple[0], range_tuple[1])
@@ -74,8 +53,7 @@ def augment_horn_blast(blast):
         blast = librosa.effects.pitch_shift(y=blast, sr=SR, n_steps=n_steps)
         rate = random.uniform(0.9, 1.1)
         blast = librosa.effects.time_stretch(blast, rate=rate)
-    except Exception as e:
-        pass 
+    except Exception as e: pass 
     return blast.astype(np.float32)
 
 def load_asset_library(folder_paths, duration=None):
@@ -107,25 +85,19 @@ def mix_audio_chunk(main_audio, secondary_audio, snr_db):
     return mixed
 
 # --- MAIN GENERATOR FUNCTION ---
-
-def generate_sample(filename, pattern_def, bg_noise, short_horns_list, long_horns_list, secondary_events_library=None):
+def generate_sample(filename, pattern_def, bg_noise, short_horns_list, long_horns_list, use_noise=False):
     
-    # 1. Warmup (Silence OR Background)
+    # 1. Warmup
     warmup_sec = random.uniform(0.5, 1.5)
     silence_samples = int(warmup_sec * SR)
     
-    if bg_noise is not None:
-        # Slice background
+    if use_noise and bg_noise is not None:
         max_start = len(bg_noise) - silence_samples
         start_idx = np.random.randint(0, max_start) if max_start > 0 else 0
-        combined_audio = bg_noise[start_idx : start_idx + silence_samples].copy()
-        # Reduce background volume slightly (0.5) so horns stand out
-        combined_audio = combined_audio * 0.5 
+        combined_audio = bg_noise[start_idx : start_idx + silence_samples].copy() * 0.5
     else:
-        # Create digital silence
         combined_audio = np.zeros(silence_samples, dtype=np.float32)
 
-    # Prepare horns
     base_short = random.choice(short_horns_list)
     base_long = random.choice(long_horns_list)
     current_short_horn = augment_horn_blast(base_short)
@@ -133,26 +105,20 @@ def generate_sample(filename, pattern_def, bg_noise, short_horns_list, long_horn
 
     # 2. Build Pattern
     for sound_type, gap_type in pattern_def:
-        
-        # A. Add Blast
         if sound_type == 'short':
             blast = process_blast(current_short_horn)
             combined_audio = np.concatenate((combined_audio, blast))
         elif sound_type == 'long':
             blast = process_blast(current_long_horn)
             combined_audio = np.concatenate((combined_audio, blast))
-        elif sound_type == 'none':
-            pass 
         
-        # B. Add Gap (Silence OR Background)
         gap_dur = 0
         if gap_type == 'interval': gap_dur = get_random_duration(RANGE_INTERVAL)
         elif gap_type == 'pause': gap_dur = get_random_duration(RANGE_PAUSE)
             
         if gap_dur > 0:
             gap_samples = int(gap_dur * SR)
-            
-            if bg_noise is not None:
+            if use_noise and bg_noise is not None:
                 max_start_bg = len(bg_noise) - gap_samples
                 if max_start_bg > 0:
                     start_idx_bg = np.random.randint(0, max_start_bg)
@@ -160,84 +126,52 @@ def generate_sample(filename, pattern_def, bg_noise, short_horns_list, long_horn
                 else:
                     tiled = np.tile(bg_noise, int(np.ceil(gap_samples/len(bg_noise))))
                     noise_chunk = tiled[:gap_samples]
-                
-                # Reduce gap background volume slightly as well
                 combined_audio = np.concatenate((combined_audio, noise_chunk * 0.5))
             else:
-                noise_chunk = np.zeros(gap_samples, dtype=np.float32)
-                combined_audio = np.concatenate((combined_audio, noise_chunk))
+                combined_audio = np.concatenate((combined_audio, np.zeros(gap_samples, dtype=np.float32)))
             
-    # 3. Secondary Events (Only if Noise is Enabled)
-    if bg_noise is not None and secondary_events_library and random.random() < SECONDARY_EVENT_PROBABILITY:
-        secondary_event = random.choice(secondary_events_library).copy()
-        event_len = len(secondary_event)
-        combined_len = len(combined_audio)
-        
-        if event_len < combined_len:
-            max_start_sample = combined_len - event_len
-            start_sample = np.random.randint(0, max_start_sample + 1)
-            end_sample = start_sample + event_len
-            event_to_place = secondary_event
-        else:
-            start_sample = 0
-            end_sample = combined_len
-            event_to_place = secondary_event[:combined_len]
-        
-        secondary_canvas = np.zeros_like(combined_audio)
-        secondary_canvas[start_sample:end_sample] = event_to_place
-        
-        snr_db = get_random_duration(RANGE_SNR_SECONDARY)
-        combined_audio = mix_audio_chunk(combined_audio, secondary_canvas, snr_db)
-
+    # 3. Secondary Events (DISABLED/REMOVED as per request)
+    # We only use continuous background noise now.
+    
     # 4. Save
     path = f"{OUTPUT_DIR}/{filename}.wav"
     sf.write(path, combined_audio, SR)
     
 # --- MAIN EXECUTION ---
-
 if __name__ == "__main__":
-    random.seed(42)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=['clean', 'noisy'], required=True, help="Generation mode")
+    args = parser.parse_args()
+
+    USE_NOISE = (args.mode == 'noisy')
+    OUTPUT_DIR = os.path.join(OUTPUT_DIR_BASE, args.mode) 
     
-    # Create Output Directory
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
+    random.seed(42)
+    if not os.path.exists(OUTPUT_DIR): os.makedirs(OUTPUT_DIR)
 
-    # Setup noise folders if they don't exist (prevents crash)
-    for folder in NOISE_CATEGORIES.values():
-        if not os.path.exists(folder):
-            try: os.makedirs(folder, exist_ok=True)
-            except: pass
-
-    print("--- Loading Audio Libraries ---")
+    print(f"--- STARTING GENERATION: {args.mode.upper()} ---")
     
     try:
         short_horns_lib = load_asset_library(HORNS_SHORT_DIR)
         long_horns_lib = load_asset_library(HORNS_LONG_DIR)
-        if not short_horns_lib or not long_horns_lib:
-             raise ValueError("Horn libraries are empty.")
+        if not short_horns_lib or not long_horns_lib: raise ValueError("Horn libraries empty.")
         
-        # Load Noise ONLY if enabled
-        if USE_BACKGROUND_NOISE:
-            print("🔊 NOISE MODE: ON (Loading backgrounds...)")
-            bg_paths = [NOISE_CATEGORIES[k] for k in ["Backgrounds", "CalmSea", "Thunderstorm"]]
-            backgrounds_lib = load_asset_library(bg_paths, duration=60)
+        backgrounds_lib = []
+        
+        if USE_NOISE:
+            # Simplified Loading: Only load Backgrounds
+            bg_path = NOISE_CATEGORIES["Backgrounds"]
+            if not os.path.exists(bg_path): os.makedirs(bg_path, exist_ok=True)
             
-            sec_paths = [NOISE_CATEGORIES[k] for k in ["BirdSounds", "Alarms", "WhiteNoise"]]
-            secondary_events_lib = load_asset_library(sec_paths)
+            backgrounds_lib = load_asset_library(bg_path, duration=60)
             
             if not backgrounds_lib:
-                print("WARNING: No background noise found! Fallback to silence.")
-                USE_BACKGROUND_NOISE = False
-        else:
-            print("🔇 NOISE MODE: OFF (Generating clean signal)")
-            backgrounds_lib = []
-            secondary_events_lib = []
+                print("WARNING: No backgrounds found in 'audio/noise/background_noise'. Reverting to Clean mode.")
+                USE_NOISE = False
         
     except ValueError as e:
         print(f"\nFATAL ERROR: {e}")
         exit(1)
-
-    print(f"\nStarting Generation: {SAMPLES_PER_CLASS} samples per class...")
 
     scenarios = {
         "01_starboard_turn":      [('short', 'none')],
@@ -256,13 +190,10 @@ if __name__ == "__main__":
     }
 
     total_files = 0
-    
     for i in range(SAMPLES_PER_CLASS):
         idx = f"{i+1:04d}"
         for prefix, pattern in scenarios.items():
-            
-            # Select background (or None if Clean Mode)
-            selected_bg = random.choice(backgrounds_lib) if USE_BACKGROUND_NOISE and backgrounds_lib else None
+            selected_bg = random.choice(backgrounds_lib) if USE_NOISE and backgrounds_lib else None
             
             generate_sample(
                 filename=f"{prefix}_{idx}", 
@@ -270,8 +201,8 @@ if __name__ == "__main__":
                 bg_noise=selected_bg, 
                 short_horns_list=short_horns_lib,
                 long_horns_list=long_horns_lib,
-                secondary_events_library=secondary_events_lib
+                use_noise=USE_NOISE
             )
             total_files += 1
 
-    print(f"Generation Complete! Created {total_files} labeled audio files in {OUTPUT_DIR}/.")
+    print(f"✅ Generation Complete! Created {total_files} {args.mode} files in {OUTPUT_DIR}/.")
