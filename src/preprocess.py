@@ -25,12 +25,15 @@ CLASS_MAP = {
     "Astern_Propulsion": 2,
     "Danger_Signal_Doubt": 3,
     "Overtake_Starboard": 4,
-    "Overtake_Port": 5,
-    "Agreement_to_Overtake": 6,
-    "Blind_Bend_Channel": 7,
-    "Not_Under_Command": 8,
-    "Noise_Only": 9,
-    "Random_Short_Blasts": 10
+    "Round_Starboard": 5,
+    "Round_Port": 6,
+    "Making_Way": 7,
+    "Overtake_Port": 8,
+    "Agreement_to_Overtake": 9,
+    "Blind_Bend_Channel": 10,
+    "Not_Under_Command": 11,
+    "Noise_Only": 12,
+    "Random_Short_Blasts": 13
 }
 
 # Helper dictionary to link file shorthand segments (like 'agree_overtake') to the canonical class name.
@@ -48,8 +51,8 @@ FILE_SEGMENT_TO_CLASS = {
     "agree_overtake": "Agreement_to_Overtake", 
 
     # Bend/Warning Signals (Mapping multiple segments to the single 'Blind_Bend_Channel' category)
-    "round_starboard": "Blind_Bend_Channel", # Assuming these signals are a single prolonged blast (Rule 34(e))
-    "round_port": "Blind_Bend_Channel",      # Same as above
+    "round_starboard": "Round_Starboard", # Assuming these signals are a single prolonged blast (Rule 34(e))
+    "round_port": "Round_Port",      # Same as above
     "making_way": "Blind_Bend_Channel",      # Assuming single prolonged blast (Rule 35(a) or Rule 34(e))
 
     # Not under command / I am unable to manoeuvre

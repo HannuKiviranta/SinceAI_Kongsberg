@@ -240,7 +240,8 @@ if __name__ == "__main__":
         "08_nuc":                 [('long', 'interval'), ('short', 'interval'), ('short', 'none')],
         "09_overtake_starboard":  [('long', 'interval'), ('long', 'interval'), ('short', 'none')],
         "10_overtake_port":       [('long', 'interval'), ('long', 'interval'), ('short', 'interval'), ('short', 'none')],
-        "11_agree_overtake":      [('long', 'interval'), ('short', 'interval'), ('long', 'interval'), ('short', 'none')]
+        "11_agree_overtake":      [('long', 'interval'), ('short', 'interval'), ('long', 'interval'), ('short', 'none')],
+        "12_no_signal":           [('pause'), ('pause'), ('pause')]
     }
 
     total_files = 0
