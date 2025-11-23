@@ -6,10 +6,11 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
 import os
 import random
+import shutil
 
 # --- CONFIGURATION ---
 N_MELS = 128                   
-N_CLASSES = 13 
+N_CLASSES = 13  # Must match the 13 classes defined in preprocess.py
 
 # --- DATASET DEFINITION ---
 class ColregDataset(Dataset):
@@ -29,7 +30,7 @@ class ColregDataset(Dataset):
             print(f"Error: Feature file not found at {feature_path}")
             raise
         
-        # Convert to Tensor (1 Channel, Height, Width)
+        # Convert to Tensor (Batch, Channel, Height, Width) -> (1, 128, Width)
         features = torch.tensor(mel_spectrogram_db).float().unsqueeze(0)
         label = torch.tensor(label_data["class_id"], dtype=torch.long)
         
@@ -40,7 +41,7 @@ class ColregClassifier(nn.Module):
     def __init__(self, num_classes, input_height):
         super(ColregClassifier, self).__init__()
         
-        # 1. CNN Block (Extracts Frequency Features)
+        # 1. CNN Block (Extracts Frequency Patterns)
         self.cnn = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=(3, 3), padding=1),
             nn.BatchNorm2d(16), nn.ReLU(),
@@ -56,12 +57,12 @@ class ColregClassifier(nn.Module):
             nn.Dropout(0.4)
         )
         
-        # Calculate flatten size for GRU input
+        # Calculate input size for the GRU
         self.output_channels = 64
         self.reduced_height = input_height // 2 // 2 // 4 
         gru_input_size = self.output_channels * self.reduced_height 
 
-        # 2. GRU Block (Extracts Time Sequence Features)
+        # 2. GRU Block (Extracts Time Patterns)
         self.gru = nn.GRU(
             input_size=gru_input_size,
             hidden_size=128,
@@ -72,24 +73,24 @@ class ColregClassifier(nn.Module):
 
         # 3. Classifier Block
         self.classifier = nn.Sequential(
-            nn.Linear(128 * 2, 64), # Bidirectional = 2 * hidden_size
+            nn.Linear(128 * 2, 64), # Bidirectional = 2 * hidden
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(64, num_classes)
         )
 
     def forward(self, x):
-        # CNN Forward
+        # CNN Feature Extraction
         cnn_out = self.cnn(x)
         
-        # Prepare for GRU: (Batch, Channels, Freq, Time) -> (Batch, Time, Features)
+        # Reshape for GRU: (Batch, Channels, Freq, Time) -> (Batch, Time, Features)
         B, C, H, T = cnn_out.size()
         gru_input = cnn_out.permute(0, 3, 1, 2).contiguous().view(B, T, C * H)
         
-        # GRU Forward
+        # Sequence Processing
         gru_out, _ = self.gru(gru_input)
         
-        # Take last hidden state (Forward + Backward)
+        # Take the last hidden state (Forward + Backward)
         last_forward = gru_out[:, -1, :128]
         last_backward = gru_out[:, 0, 128:]
         gru_output_combined = torch.cat((last_forward, last_backward), dim=1)
@@ -99,8 +100,8 @@ class ColregClassifier(nn.Module):
 # --- TRAINING ENGINE ---
 def run_training_phase(phase_name, labels_file, model, num_epochs, lr, save_path, load_path=None):
     """
-    Runs a complete training session (Phase).
-    Can optionally load weights from a previous phase (Fine-Tuning).
+    Runs a training loop. 
+    If load_path is provided, it loads existing weights (Fine-Tuning).
     """
     print(f"\n" + "="*50)
     print(f"🚀 STARTING PHASE: {phase_name.upper()}")
@@ -109,13 +110,13 @@ def run_training_phase(phase_name, labels_file, model, num_epochs, lr, save_path
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     
-    # 1. Load Previous Weights (if requested)
+    # 1. Load Previous Weights (if applicable)
     if load_path:
         if os.path.exists(load_path):
             print(f"🔄 Loading weights from previous phase: {load_path}")
             try:
                 model.load_state_dict(torch.load(load_path, map_location=device))
-                print("✅ Weights loaded successfully. Fine-tuning...")
+                print("✅ Weights loaded. Starting Fine-Tuning.")
             except Exception as e:
                 print(f"⚠️ Warning: Failed to load weights ({e}). Starting fresh.")
         else:
@@ -123,10 +124,10 @@ def run_training_phase(phase_name, labels_file, model, num_epochs, lr, save_path
     
     # 2. Load Data Labels
     if not os.path.exists(labels_file):
-        print(f"❌ Skipping Phase '{phase_name}': Metadata file '{labels_file}' not found.")
-        return
+        print(f"⚠️ Skipping Phase '{phase_name}': Metadata file '{labels_file}' not found.")
+        return False
 
-    print(f"📂 Loading data from: {labels_file}")
+    print(f"📂 Loading dataset: {labels_file}")
     all_labels = np.load(labels_file, allow_pickle=True)
     random.shuffle(all_labels)
     
@@ -190,6 +191,7 @@ def run_training_phase(phase_name, labels_file, model, num_epochs, lr, save_path
     
     print(f"✅ Phase '{phase_name}' Complete. Best Accuracy: {best_accuracy:.2f}%")
     print(f"💾 Model saved to: {save_path}")
+    return True
 
 # --- MAIN EXECUTION ---
 if __name__ == '__main__':
@@ -199,43 +201,46 @@ if __name__ == '__main__':
     LABELS_CLEAN = os.path.join(DATA_DIR, "labels_clean.npy")
     LABELS_NOISY = os.path.join(DATA_DIR, "labels_noisy.npy")
     
-    # Intermediate model (after clean training)
+    # Intermediate model (Clean Only)
     MODEL_CLEAN = "colreg_model_clean.pth"
-    # Final model (after noisy training)
+    # Final model (Best result)
     MODEL_FINAL = "colreg_classifier_best.pth"
     
-    # Initialize Architecture
+    # Initialize Model
     model = ColregClassifier(num_classes=N_CLASSES, input_height=N_MELS)
 
-    # --- PHASE 1: CLEAN TRAINING (Curriculum Start) ---
-    # Higher Learning Rate (0.001), More Epochs (30)
-    run_training_phase(
+    # --- PHASE 1: CLEAN TRAINING ---
+    # Learn the shapes of the horns without distraction
+    success_clean = run_training_phase(
         phase_name="Clean",
         labels_file=LABELS_CLEAN,
         model=model,
-        num_epochs=35, 
+        num_epochs=30, 
         lr=0.001,
         save_path=MODEL_CLEAN,
-        load_path=None # Start from scratch
+        load_path=None
     )
 
-    # --- PHASE 2: NOISY FINE-TUNING (Curriculum Advanced) ---
-    # Lower Learning Rate (0.0001) to preserve knowledge, fewer epochs (20)
-    # Only runs if labels_noisy.npy exists
-    run_training_phase(
+    # --- PHASE 2: NOISY FINE-TUNING ---
+    # Learn to ignore the background noise (Lower LR to not break previous learning)
+    success_noisy = run_training_phase(
         phase_name="Noisy",
         labels_file=LABELS_NOISY,
         model=model,
         num_epochs=20, 
         lr=0.0001, 
         save_path=MODEL_FINAL,
-        load_path=MODEL_CLEAN # Load weights from Phase 1
+        load_path=MODEL_CLEAN
     )
     
-    # Fallback: If Phase 2 didn't run (no noisy data), ensure we still have a "best" model file
-    if not os.path.exists(MODEL_FINAL) and os.path.exists(MODEL_CLEAN):
-        print("\n⚠️ No noisy training performed. Using Clean model as Final model.")
-        import shutil
-        shutil.copy(MODEL_CLEAN, MODEL_FINAL)
+    # Fallback Logic: Ensure we always output a 'best' file
+    if not success_noisy:
+        if success_clean:
+            print("\n⚠️ No noisy training performed (or failed). Using Clean model as Final.")
+            if os.path.exists(MODEL_CLEAN):
+                shutil.copy(MODEL_CLEAN, MODEL_FINAL)
+        else:
+            print("\n❌ Critical Error: Both training phases failed.")
+            exit(1)
     
-    print(f"\n🎉 Full Curriculum Training Workflow Complete!")
+    print(f"\n🎉 Full Training Workflow Complete!")
