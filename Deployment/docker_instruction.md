@@ -1,88 +1,44 @@
 
-# 🚢 COLREG Sound Signal Classifier
+# 🐳 Docker Deployment Guide
 
-A robust, containerized Machine Learning system designed to detect and classify maritime sound signals according to **COLREG Rules 34 & 35**.
+This guide provides detailed instructions on how to build, run, and utilize the **COLREG Sound Signal Classifier** using Docker. This approach ensures the application runs consistently on any operating system (Windows, Mac, Linux) without manual dependency installation.
 
-This project uses a **CNN + GRU** deep learning architecture to identify signals like "Overtaking", "Altering Course", and "Not Under Command" in audio streams. It features a **Curriculum Learning** pipeline that first trains on clean synthetic data and then fine-tunes on noisy data (wind, waves, engine noise) for real-world robustness.
+## 📋 Prerequisites
 
-## 🌟 Features
-
--   **Curriculum Training:** Automated pipeline trains on clean data first, then improves with noisy environments.
+-   **Docker Desktop** installed and running.
     
--   **Synthetic Data Generator:** Creates thousands of labeled samples (`.wav`) mixed with realistic sea/wind noise.
+-   **NVIDIA GPU Drivers** (Optional, for faster training on Windows/Linux).
     
--   **Dockerized Workflow:** Zero-dependency setup. One command to generate data, train, and output a model.
-    
--   **GPU Acceleration:** Supports NVIDIA CUDA for fast training.
+-   **Audio Data:** Your source `.wav` files must be organized in the `audio/` folder as described in the main README.
     
 
-## 📁 Repository Structure
+## 1. Build the Docker Image
 
-```
-.
-├── Deployment/              # Docker configuration files
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── train_pipeline.sh    # Orchestrator script
-├── models/                  # Place your pre-trained .pth model here
-├── audio/                   # Raw Audio Assets (Input for training)
-│   ├── horns/               
-│   └── noise/               
-├── src/                     # Source Code
-│   ├── data_gen.py          
-│   ├── preprocess.py        
-│   ├── train_colreg_classifier.py 
-│   └── predictor.py         
-├── input_to_predict_COLREG/ # Place your .wav files here to test them
-├── predictor_logs/          # Inference logs are saved here
-└── README.md
+You must build the image once before using it. This packages Python, PyTorch, Librosa, and all project scripts into a portable container.
 
-```
-
-## 🚀 Quick Start (Docker)
-
-### 1. Build the Image
-
-Because the Dockerfile is in the `Deployment/` folder, run this specific command from the **root** of the project:
+**Command (Run from project root):**
 
 ```
 docker build -t colreg-classifier -f Deployment/Dockerfile .
 
 ```
 
-### 2. Run the Training Pipeline (Optional)
+> **Note:** The `-f Deployment/Dockerfile` flag tells Docker where to find the configuration file, while the `.` at the end sets the "build context" to the current folder (so it can see your `src/` and `audio/` folders).
 
-If you **do not** have a model yet, run this to generate data and train one from scratch.
+## 2. Train the Model (Full Pipeline)
 
-#### Option A: With NVIDIA GPU (Fastest)
+This single command launches the entire training workflow:
 
-Use this if you have an NVIDIA card and drivers installed.
+1.  **Generates** synthetic data (Clean & Noisy).
+    
+2.  **Preprocesses** audio into spectrograms.
+    
+3.  **Trains** the Neural Network (Curriculum Learning).
+    
+4.  **Saves** the final model (`colreg_classifier_best.pth`) to your local `models/` folder.
+    
 
-**Linux / Mac (Intel):**
-
-```
-docker run --rm --gpus all \
-  -v "$(pwd)/audio:/app/audio" \
-  -v "$(pwd)/models:/app/models" \
-  colreg-classifier
-
-```
-
-**Windows (PowerShell):**
-
-```
-docker run --rm --gpus all `
-  -v "${PWD}/audio:/app/audio" `
-  -v "${PWD}/models:/app/models" `
-  colreg-classifier
-
-```
-
-#### Option B: CPU Only / Mac M1/M2 (Compatible)
-
-Use this if you are on a MacBook or a machine without an NVIDIA GPU. It works exactly the same but may be slower.
-
-**Linux / Mac:**
+### For Linux / Mac (Intel & M1/M2/M3)
 
 ```
 docker run --rm \
@@ -92,7 +48,7 @@ docker run --rm \
 
 ```
 
-**Windows (PowerShell):**
+### For Windows (PowerShell)
 
 ```
 docker run --rm `
@@ -102,22 +58,22 @@ docker run --rm `
 
 ```
 
-## ⚡ Using an Existing / Pre-Trained Model
+### For NVIDIA GPU Users (Faster)
 
-If you already have a trained model file (e.g., `colreg_classifier_best.pth`), follow these steps to skip training and start predicting immediately.
+Add the `--gpus all` flag to your command:
 
-### Step 1: Place your files
+```
+docker run --rm --gpus all ... (rest of command)
 
-1.  Copy your trained model file into the **`models/`** folder on your computer.
-    
-2.  Copy the audio file you want to check into the **`input_to_predict_COLREG/`** folder.
-    
+```
 
-### Step 2: Run Prediction
+## 3. Run Prediction (Inference)
 
-Run this command to mount your local folders into the container. Docker will read the model from your `models` folder and the audio from your `input` folder.
+Once you have a trained model in your `models/` folder, you can use the container to classify new audio files.
 
-**Linux / Mac:**
+**Scenario:** You have a recording named `recording.wav` inside your `input_to_predict_COLREG/` folder.
+
+### Command (Linux / Mac)
 
 ```
 docker run --rm \
@@ -130,20 +86,20 @@ docker run --rm \
 
 ```
 
-**Windows (PowerShell):**
+### Command (Windows PowerShell)
 
 ```
 docker run --rm `
   -v "${PWD}/models:/app/models" `
   -v "${PWD}/input_to_predict_COLREG:/app/input" `
   -v "${PWD}/predictor_logs:/app/predictor_logs" `
-  --entrypoint python \
-  colreg-classifier \
+  --entrypoint python `
+  colreg-classifier `
   src/predictor.py --file /app/input/recording.wav --model /app/models/colreg_classifier_best.pth
 
 ```
 
-### Example Output
+**Output Example:**
 
 ```
 ========================================
@@ -156,48 +112,10 @@ Confidence:       98.45%
 
 ```
 
-## 🛠️ Configuration
+## 🛠️ Troubleshooting
 
-You can tweak the system behavior by editing the files in `src/`.
-## 🛠️ Configuration
-
-You can tweak the system behavior by editing the files in `src/`.
-
-| File | Setting |Description|
-|--|--|--|
-| `src/data_gen.py`|`SAMPLES_PER_CLASS`|How many files to generate (Default: 500/phase)
-| `src/data_gen.py`| `RANGE_SNR_SECONDARY` |How loud the background noise is (in dB)
-| `src/preprocess.py`| `CLIP_DURATION_SEC`| Length of audio to analyze (Default: 20s)
-
-### Supported Classes
-
-1.  **Alter Starboard** (1 Short)
+-   **"Image not found":** Ensure you ran the `docker build` command in Step 1.
     
-2.  **Alter Port** (2 Short)
+-   **"No such file or directory":** Ensure you are running the command from the root `SinceAI_Konsberg` folder.
     
-3.  **Astern Propulsion** (3 Short)
-    
-4.  **Danger/Doubt** (5 Short)
-    
-5.  **Round Starboard** (4 Short, 1 Short)
-    
-6.  **Round Port** (4 Short, 2 Short)
-    
-7.  **Blind Bend / Making Way** (1 Long)
-    
-8.  **Overtake Starboard** (2 Long, 1 Short)
-    
-9.  **Overtake Port** (2 Long, 2 Short)
-    
-10.  **Agree Overtake** (1 Long, 1 Short, 1 Long, 1 Short)
-    
-11.  **Not Under Command** (1 Long, 2 Short)
-    
-12.  **Noise Only** (Background sounds)
-    
-13.  **Random Short Blasts** (Confusion signal)
-    
-
-## 📜 License
-
-This project is open-source. Developed for Maritime Safety AI research.
+-   **"No audio files found":** Check that your `audio/horns/short` and `audio/horns/long` folders are not empty.
