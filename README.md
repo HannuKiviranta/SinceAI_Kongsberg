@@ -25,10 +25,8 @@ The system processes audio in three distinct stages:
 2.  **Feature Extraction (CNN):** A Convolutional Neural Network scans the spectrogram to identify the "shape" of horn blasts and distinguish them from noise.
     
 3.  **Sequence Recognition (GRU):** A Recurrent Neural Network analyzes the timing and order of the blasts (e.g., "Short-Short-Short" vs "Long-Short") to classify the COLREG signal.
-    
 
-## 📋 Supported Classes (COLREGs)
-
+![Workflow Diagram](src/workflow_diagram.png)
 
 ## 📋 Supported Classes (COLREGs)
 
@@ -43,7 +41,7 @@ The system processes audio in three distinct stages:
 | 6        | 4 Short, 2 Short     | Vessel turning round to port.                                |
 | 7        | 1 Long               | Blind Bend / Power-driven vessel making way.                 |
 | 8        | 2 Long, 2 Short      | I intend to overtake you on your port side.                  |
-| 9        | L-S-L-S              | Agreement to be overtaken.                                   |
+| 9        | Long-Short-Long-Short              | Agreement to be overtaken.                                   |
 | 10       | 1 Long, 2 Short      | Not Under Command / Restricted Ability.                      |
 | 11       | (Silence)            | Background Noise Only.                                       |
 | 12       | 8+ Short             | Random Short Blasts / General Alarm.                         |
