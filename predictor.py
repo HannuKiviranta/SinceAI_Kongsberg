@@ -5,17 +5,22 @@ import librosa
 import argparse
 import os
 import sys
+import datetime
 
 # --- 1. CONFIGURATION ---
 N_MELS = 128
 SR = 22050
 HOP_LENGTH = 512
-CLIP_DURATION_SEC = 20 # UPDATED: Set to 20 to match your new training data
+CLIP_DURATION_SEC = 20 
 
-# Calculate width dynamically so it is ALWAYS correct (862 pixels for 20s)
+# Calculate width dynamically
 MAX_WIDTH = int(np.ceil(CLIP_DURATION_SEC * (SR / HOP_LENGTH)))
 
 MODEL_PATH = "colreg_classifier/colreg_classifier_best.pth"
+
+# Log Configuration
+LOG_DIR = "predictor_logs"
+LOG_FILE = "prediction_log.txt" 
 
 # Class mapping (13 Classes)
 COLREG_CLASSES = [
@@ -83,26 +88,19 @@ class ColregClassifier(nn.Module):
         gru_output_combined = torch.cat((last_forward, last_backward), dim=1)
         return self.classifier(gru_output_combined)
 
-# --- 3. PREPROCESSING UTILS ---
+# --- 3. UTILS ---
 def preprocess_audio(file_path):
-    """Loads wav, converts to mel spectrogram, pads to correct size, returns Tensor."""
     try:
         y, sr = librosa.load(file_path, sr=SR)
-        
-        # 1. Time-Domain Padding (Matches preprocess.py logic)
         target_samples = int(SR * CLIP_DURATION_SEC)
         if len(y) < target_samples:
             y = np.pad(y, (0, target_samples - len(y)), 'constant')
         elif len(y) > target_samples:
             y = y[:target_samples]
 
-        # 2. Mel Spectrogram (Matches preprocess.py parameters)
-        # Removed fmax=8000 because training didn't use it
-        # Added hop_length=HOP_LENGTH
         mels = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=N_MELS, hop_length=HOP_LENGTH)
         mels_db = librosa.power_to_db(mels, ref=np.max)
         
-        # 3. Spectrogram Width Safety Check
         current_width = mels_db.shape[1]
         if current_width < MAX_WIDTH:
             padding = MAX_WIDTH - current_width
@@ -112,10 +110,33 @@ def preprocess_audio(file_path):
             
         tensor = torch.tensor(mels_db).float().unsqueeze(0).unsqueeze(0)
         return tensor
-        
     except Exception as e:
         print(f"Error processing audio file: {e}")
         return None
+
+def log_prediction(audio_file, predicted_class, confidence):
+    """Appends the prediction result to a log file in a specific folder."""
+    
+    # Ensure log directory exists
+    if not os.path.exists(LOG_DIR):
+        try:
+            os.makedirs(LOG_DIR)
+        except OSError as e:
+            print(f"Warning: Could not create log directory {LOG_DIR}: {e}")
+            return
+
+    # Full path to the log file
+    log_path = os.path.join(LOG_DIR, LOG_FILE)
+    
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"[{timestamp}] File: {os.path.basename(audio_file)} | Prediction: {predicted_class} | Confidence: {confidence:.2f}%\n"
+    
+    try:
+        with open(log_path, "a") as f:
+            f.write(log_entry)
+        print(f"   [Log saved to {log_path}]")
+    except Exception as e:
+        print(f"Warning: Could not save log: {e}")
 
 # --- 4. MAIN EXECUTION ---
 if __name__ == "__main__":
@@ -129,7 +150,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Loading model from {args.model} on {device}...")
     
     try:
         model = ColregClassifier(num_classes=len(COLREG_CLASSES), input_height=N_MELS)
@@ -140,7 +160,6 @@ if __name__ == "__main__":
         print(f"Failed to load model: {e}")
         sys.exit(1)
 
-    print(f"Processing audio file: {args.file}")
     if not os.path.exists(args.file):
         print("ERROR: Audio file not found.")
         sys.exit(1)
@@ -158,6 +177,9 @@ if __name__ == "__main__":
         score, predicted_idx = torch.max(probabilities, 1)
         predicted_class = COLREG_CLASSES[predicted_idx.item()]
         confidence = score.item() * 100
+
+    # Log result to Text File in the new folder
+    log_prediction(args.file, predicted_class, confidence)
 
     print("\n" + "="*40)
     print(f"PREDICTION RESULT")
