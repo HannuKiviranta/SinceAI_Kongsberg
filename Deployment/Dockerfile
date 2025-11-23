@@ -1,37 +1,36 @@
-# USE NVIDIA BASE IMAGE (Includes CUDA 12.1 and PyTorch pre-installed)
+# 1. Base Image (NVIDIA PyTorch)
 FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
 
-# Set environment variables
+# 2. Settings
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install system libraries (libsndfile is still needed for Librosa)
-# We use DEBIAN_FRONTEND=noninteractive to prevent timezone prompts
+# 3. Install System Dependencies
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libsndfile1 \
     dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Copy requirements
-COPY requirements.txt .
-
-# Install Python dependencies
-# Note: We remove 'torch' and 'torchaudio' from requirements.txt below
-# because the base image already has the optimized GPU versions!
+# 4. Install Python Dependencies
+# FIX: Look inside 'Deployment/' folder
+COPY Deployment/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
+# 5. Copy Source Code
+# predictor.py is inside src/, so this single command copies everything we need
 COPY src/ src/
-COPY predictor.py .
-COPY train_pipeline.sh .
 
-# Windows Fix & Permissions
+# 6. Copy Pipeline Script
+# FIX: Look inside 'Deployment/' folder
+COPY Deployment/train_pipeline.sh .
+
+# 7. Fix Permissions (Windows line endings)
 RUN dos2unix train_pipeline.sh && chmod +x train_pipeline.sh
 
-# Directories
+# 8. Create Data Directories
 RUN mkdir -p /app/audio /app/models /app/dataset
 
+# 9. Run
 ENTRYPOINT ["./train_pipeline.sh"]
