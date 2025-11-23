@@ -13,7 +13,7 @@ if [ -z "$(ls -A /app/audio/horns/short 2>/dev/null)" ]; then
 fi
 
 # --- PHASE 1: CLEAN DATA ---
-echo "Step [1/5]: Generating CLEAN dataset (1000 samples/class)..."
+echo "Step [1/5]: Generating CLEAN dataset (500 samples/class)..."
 python src/data_gen.py --mode clean
 
 echo "Step [2/5]: Preprocessing CLEAN data..."
@@ -22,7 +22,7 @@ python src/preprocess.py --source dataset/train/clean --label_file labels_clean.
 # --- PHASE 2: NOISY DATA ---
 # Check if background noise exists in the mounted volume before trying to generate noisy data
 if [ -d "/app/audio/noise/background_noise" ] && [ "$(ls -A /app/audio/noise/background_noise)" ]; then
-    echo "Step [3/5]: Generating NOISY dataset (1000 samples/class)..."
+    echo "Step [3/5]: Generating NOISY dataset (500 samples/class)..."
     python src/data_gen.py --mode noisy
 
     echo "Step [4/5]: Preprocessing NOISY data..."
