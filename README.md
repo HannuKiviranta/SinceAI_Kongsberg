@@ -77,7 +77,7 @@ This project is designed to run entirely within Docker.
 
 ### 📘 Detailed Instructions
 
-For specific commands for **Windows**, **Mac**, and **Linux**, please read the dedicated guide: 👉 [**Deployment/docker_instruction.md**](https://www.google.com/search?q=Deployment/docker_instruction.md "null")
+For specific commands for **Windows**, **Mac**, and **Linux**, please read the dedicated guide: 👉 [**Deployment/docker_instruction.md**](https://github.com/HannuKiviranta/SinceAI_Konsberg/blob/dockerized/Deployment/docker_instruction.md)
 
 ### Basic Summary
 
