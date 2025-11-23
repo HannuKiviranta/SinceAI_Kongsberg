@@ -29,7 +29,12 @@ This project uses a **CNN + GRU** deep learning architecture to identify signals
 │   ├── horns/               
 │   └── noise/               
 ├── src/                     # Source Code
+│   ├── data_gen.py          
+│   ├── preprocess.py        
+│   ├── train_colreg_classifier.py 
+│   └── predictor.py         
 ├── input_to_predict_COLREG/ # Place your .wav files here to test them
+├── predictor_logs/          # Inference logs are saved here
 └── README.md
 
 ```
@@ -47,9 +52,13 @@ docker build -t colreg-classifier -f Deployment/Dockerfile .
 
 ### 2. Run the Training Pipeline (Optional)
 
-If you **do not** have a model yet, run this to generate data and train one from scratch:
+If you **do not** have a model yet, run this to generate data and train one from scratch.
 
-**Linux / Mac:**
+#### Option A: With NVIDIA GPU (Fastest)
+
+Use this if you have an NVIDIA card and drivers installed.
+
+**Linux / Mac (Intel):**
 
 ```
 docker run --rm --gpus all \
@@ -69,6 +78,30 @@ docker run --rm --gpus all `
 
 ```
 
+#### Option B: CPU Only / Mac M1/M2 (Compatible)
+
+Use this if you are on a MacBook or a machine without an NVIDIA GPU. It works exactly the same but may be slower.
+
+**Linux / Mac:**
+
+```
+docker run --rm \
+  -v "$(pwd)/audio:/app/audio" \
+  -v "$(pwd)/models:/app/models" \
+  colreg-classifier
+
+```
+
+**Windows (PowerShell):**
+
+```
+docker run --rm `
+  -v "${PWD}/audio:/app/audio" `
+  -v "${PWD}/models:/app/models" `
+  colreg-classifier
+
+```
+
 ## ⚡ Using an Existing / Pre-Trained Model
 
 If you already have a trained model file (e.g., `colreg_classifier_best.pth`), follow these steps to skip training and start predicting immediately.
@@ -77,12 +110,8 @@ If you already have a trained model file (e.g., `colreg_classifier_best.pth`), f
 
 1.  Copy your trained model file into the **`models/`** folder on your computer.
     
-    -   _Example:_ `models/colreg_classifier_best.pth`
-        
 2.  Copy the audio file you want to check into the **`input_to_predict_COLREG/`** folder.
     
-    -   _Example:_ `input_to_predict_COLREG/recording.wav`
-        
 
 ### Step 2: Run Prediction
 
@@ -108,8 +137,8 @@ docker run --rm `
   -v "${PWD}/models:/app/models" `
   -v "${PWD}/input_to_predict_COLREG:/app/input" `
   -v "${PWD}/predictor_logs:/app/predictor_logs" `
-  --entrypoint python `
-  colreg-classifier `
+  --entrypoint python \
+  colreg-classifier \
   src/predictor.py --file /app/input/recording.wav --model /app/models/colreg_classifier_best.pth
 
 ```
@@ -130,30 +159,15 @@ Confidence:       98.45%
 ## 🛠️ Configuration
 
 You can tweak the system behavior by editing the files in `src/`.
+## 🛠️ Configuration
 
-File
+You can tweak the system behavior by editing the files in `src/`.
 
-Setting
-
-Description
-
-`src/data_gen.py`
-
-`SAMPLES_PER_CLASS`
-
-How many files to generate (Default: 500/phase)
-
-`src/data_gen.py`
-
-`RANGE_SNR_SECONDARY`
-
-How loud the background noise is (in dB)
-
-`src/preprocess.py`
-
-`CLIP_DURATION_SEC`
-
-Length of audio to analyze (Default: 20s)
+| File | Setting |Description|
+|--|--|--|
+| `src/data_gen.py`|`SAMPLES_PER_CLASS`|How many files to generate (Default: 500/phase)
+| `src/data_gen.py`| `RANGE_SNR_SECONDARY` |How loud the background noise is (in dB)
+| `src/preprocess.py`| `CLIP_DURATION_SEC`| Length of audio to analyze (Default: 20s)
 
 ### Supported Classes
 
