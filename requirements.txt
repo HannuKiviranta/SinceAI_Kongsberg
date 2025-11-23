@@ -1,5 +1,0 @@
-numpy
-librosa
-soundfile
-scikit-learn
-matplotlib

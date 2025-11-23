@@ -1,34 +1,37 @@
-# Use a slim Python image for a smaller footprint
-FROM python:3.10-slim
+# USE NVIDIA BASE IMAGE (Includes CUDA 12.1 and PyTorch pre-installed)
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
 
-# Set the working directory inside the container
-WORKDIR /app
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# 1. Install necessary system dependencies
-# These are crucial for libraries like soundfile and librosa
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    build-essential \
-    libblas3 \
-    liblapack3 \
-    ffmpeg \
+# Install system libraries (libsndfile is still needed for Librosa)
+# We use DEBIAN_FRONTEND=noninteractive to prevent timezone prompts
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    libsndfile1 \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Copy requirements and install Python dependencies
-COPY deployment/requirements.txt .
+# Set working directory
+WORKDIR /app
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+# Note: We remove 'torch' and 'torchaudio' from requirements.txt below
+# because the base image already has the optimized GPU versions!
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3. Copy all source code (Generator, Preprocessor, and Trainer)
-# We copy them into the correct folder structure (/app/src/)
-RUN mkdir -p src/
-COPY src/train_colreg_classifier.py src/
-COPY src/data_gen.py src/       # <-- Data Generator
-COPY src/preprocess.py src/     # <-- Feature Extractor
+# Copy source code
+COPY src/ src/
+COPY predictor.py .
+COPY train_pipeline.sh .
 
-# 4. Create the required data mount point
-# This directory MUST match the mount point you use in the 'docker run' command.
-# It aligns with your host directory structure (dataset/ features, train, labels.npy)
-RUN mkdir -p dataset
+# Windows Fix & Permissions
+RUN dos2unix train_pipeline.sh && chmod +x train_pipeline.sh
 
-# Set the default command to run the training script
-CMD ["python", "src/train_colreg_classifier.py"]
+# Directories
+RUN mkdir -p /app/audio /app/models /app/dataset
+
+ENTRYPOINT ["./train_pipeline.sh"]
