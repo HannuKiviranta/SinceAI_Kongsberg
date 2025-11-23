@@ -18,6 +18,12 @@ Exclude the trained model weights
 *.pt
 colreg_classifier_best.pth
 
+--- Logs ---
+predictor_logs/
+*.log
+prediction_log.txt
+prediction_log.csv
+
 --- Environments ---
 
 venv/
