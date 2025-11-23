@@ -109,6 +109,8 @@ def run_training_phase(phase_name, labels_file, model, num_epochs, lr, save_path
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
+
+    print(f"\n--- Starting Training on {device} ---")
     
     # 1. Load Previous Weights (if applicable)
     if load_path:
