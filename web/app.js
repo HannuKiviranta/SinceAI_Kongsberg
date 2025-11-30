@@ -58,24 +58,12 @@ function showResults(data) {
     document.getElementById('processingTime').textContent = `${data.processing_time}s`;
     document.getElementById('audioDuration').textContent = `${data.audio_duration}s`;
 
-    // NEW: Display spectrogram if available
-    if (data.spectrogram) {
-        const spectrogramContainer = document.getElementById('spectrogramContainer');
-        const spectrogramImage = document.getElementById('spectrogramImage');
-
-        spectrogramImage.src = data.spectrogram;
-        spectrogramContainer.style.display = 'block';
-
-        addLog('✓ Mel spectrogram generated', 'success');
-    }
-
     // Scroll to results
     resultsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function hideResults() {
     document.getElementById('resultsPanel').style.display = 'none';
-    document.getElementById('spectrogramContainer').style.display = 'none';  // NEW: Hide spectrogram too
 }
 
 function updateSystemStatus(status, text) {
@@ -181,7 +169,6 @@ async function classifyUploadedFile() {
     formData.append('file', currentAudioFile);
 
     addLog('Sending file to classifier...', 'warning');
-    addLog('Generating mel spectrogram...', 'info');  // NEW
     document.getElementById('classifyBtn').disabled = true;
 
     try {
@@ -363,7 +350,6 @@ async function classifyRecording() {
     formData.append('file', recordedAudioBlob, 'recording.wav');
 
     addLog('Classifying recorded audio...', 'warning');
-    addLog('Generating mel spectrogram...', 'info');  // NEW
     document.getElementById('classifyRecordingBtn').disabled = true;
 
     try {

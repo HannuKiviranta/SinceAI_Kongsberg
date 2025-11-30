@@ -140,12 +140,10 @@ def preprocess_audio(file_path):
             mels_db = mels_db[:, :MAX_WIDTH]
         
         tensor = torch.tensor(mels_db).float().unsqueeze(0).unsqueeze(0)
-        
-        # Return both tensor and spectrogram data
-        return tensor, mels_db
+        return tensor
     except Exception as e:
         print(f"Error preprocessing: {e}")
-        return None, None
+        return None
 
 # --- API ENDPOINTS ---
 
@@ -163,10 +161,7 @@ def get_status():
     })
 
 @app.route('/api/classify', methods=['POST'])
-@app.route('/api/classify', methods=['POST'])
-
 def classify_audio():
-
     """Classify uploaded audio"""
     start_time = time.time()
     
@@ -193,8 +188,8 @@ def classify_audio():
         y, sr = librosa.load(filepath, sr=SR)
         duration = len(y) / sr
         
-        # Preprocess - NOW RETURNS BOTH TENSOR AND SPECTROGRAM
-        input_tensor, mels_db = preprocess_audio(filepath)
+        # Preprocess
+        input_tensor = preprocess_audio(filepath)
         if input_tensor is None:
             os.remove(filepath)
             return jsonify({'error': 'Failed to process audio'}), 400
@@ -212,42 +207,6 @@ def classify_audio():
         
         processing_time = time.time() - start_time
         
-        # Convert spectrogram to base64 image for display
-        import matplotlib
-        matplotlib.use('Agg')  # Use non-interactive backend
-        import matplotlib.pyplot as plt
-        from io import BytesIO
-        import base64
-        
-        # Create spectrogram image
-        fig, ax = plt.subplots(figsize=(10, 4))
-        img = ax.imshow(mels_db, aspect='auto', origin='lower', cmap='viridis')
-        ax.set_xlabel('Time Frames', color='white')
-        ax.set_ylabel('Mel Frequency Bands', color='white')
-        ax.set_title('Mel Spectrogram', color='#f5c041', fontsize=14, weight='bold')
-        
-        # Style it to match our UI
-        fig.patch.set_facecolor('#010711')
-        ax.set_facecolor('#010711')
-        ax.tick_params(colors='#7dd0ff')
-        ax.spines['bottom'].set_color('#7dd0ff')
-        ax.spines['top'].set_color('#7dd0ff')
-        ax.spines['left'].set_color('#7dd0ff')
-        ax.spines['right'].set_color('#7dd0ff')
-        
-        # Add colorbar
-        cbar = plt.colorbar(img, ax=ax)
-        cbar.set_label('Amplitude (dB)', color='white')
-        cbar.ax.yaxis.set_tick_params(color='#7dd0ff')
-        plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='#7dd0ff')
-        
-        # Convert to base64
-        buffer = BytesIO()
-        plt.savefig(buffer, format='png', facecolor='#010711', edgecolor='none', bbox_inches='tight')
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-        plt.close(fig)
-        
         # Cleanup
         os.remove(filepath)
         
@@ -257,7 +216,6 @@ def classify_audio():
             'confidence': round(confidence, 2),
             'processing_time': round(processing_time, 3),
             'audio_duration': round(duration, 2),
-            'spectrogram': f'data:image/png;base64,{image_base64}',  # NEW!
             'all_probabilities': {
                 COLREG_CLASSES[i]: round(probabilities[0][i].item() * 100, 2)
                 for i in range(len(COLREG_CLASSES))
