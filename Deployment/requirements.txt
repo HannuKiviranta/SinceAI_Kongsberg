@@ -3,3 +3,9 @@ librosa==0.10.1
 soundfile
 scikit-learn
 matplotlib
+flask
+flask-cors
+torch
+numpy
+scipy
+werkzeug
