@@ -6,8 +6,8 @@ echo "🚢  COLREG CLASSIFIER: CURRICULUM TRAINING PIPELINE"
 echo "=========================================================="
 
 # 1. Safety Check: Ensure audio files are mounted
-if [ -z "$(ls -A /app/audio/horns/short 2>/dev/null)" ]; then
-    echo "❌ ERROR: No short horn files found!"
+if [ -z "$(ls -A /app/audio/horns 2>/dev/null)" ]; then
+    echo "❌ ERROR: No horn files found!"
     echo "   Please make sure you mount your local 'audio' folder to '/app/audio'"
     exit 1
 fi
