@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COLREG Sound Signal Classifier - Kongsberg Maritime</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- CRT Scanline Effect -->
+  <div class="crt-overlay"></div>
+  
+  <!-- Main Application Container -->
+  <div class="app-container">
+    
+    <!-- HEADER SECTION -->
+    <header>
+      <div class="header-title">
+        <div>
+          <h1>◈ COLREG SOUND SIGNAL CLASSIFIER</h1>
+          <p class="system-id">KONGSBERG MARITIME SYSTEMS :: ML-CLASSIFY-v2.4</p>
+        </div>
+      </div>
+      <p class="subtitle">
+        AUTOMATED MARITIME SOUND SIGNAL DETECTION & CLASSIFICATION TERMINAL
+      </p>
+      
+      <!-- System Status Badge -->
+      <div class="status-badge">
+        <span class="status-indicator"></span>
+        <span>SYSTEM READY</span>
+      </div>
+      
+      <!-- Navigation Tabs -->
+      <nav>
+        <button class="nav-tab active" data-page="classify">CLASSIFIER</button>
+        <button class="nav-tab" data-page="training">TRAINING</button>
+        <button class="nav-tab" data-page="system">SYSTEM INFO</button>
+      </nav>
+    </header>
+
+    <!-- PAGE: CLASSIFIER (Default View) -->
+    <div id="page-classify" class="page active">
+      
+      <!-- Control Panel (Main Actions) -->
+      <div class="panel control-panel">
+        <div class="panel-header">
+          <h2><span class="panel-icon">🎯</span> CLASSIFICATION CONTROLS</h2>
+        </div>
+        
+        <div class="grid-2">
+          <!-- FILE UPLOAD SECTION -->
+          <div>
+            <h3 class="text-secondary mb-md" style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.08em;">
+              📁 UPLOAD AUDIO FILE
+            </h3>
+            <div class="upload-zone" id="uploadZone">
+              <div class="upload-icon">📤</div>
+              <p style="color: var(--text-primary); margin: 0;">
+                Drop .wav file here or click to browse
+              </p>
+              <p class="upload-text">
+                Supported: <strong>WAV format</strong> | Max: <strong>20 seconds</strong>
+              </p>
+              <input type="file" id="fileInput" accept=".wav">
+            </div>
+            <div class="mt-md" style="display: flex; gap: 8px;">
+              <button class="btn btn-primary" id="classifyBtn" disabled>
+                <span>▶</span> CLASSIFY SIGNAL
+              </button>
+              <button class="btn btn-secondary" id="clearFileBtn" disabled>
+                <span>✖</span> CLEAR
+              </button>
+            </div>
+            <div id="fileInfo" class="mt-sm" style="color: var(--text-secondary); font-size: 0.85rem;">
+              No file selected
+            </div>
+          </div>
+
+          <!-- MICROPHONE RECORDER SECTION -->
+          <div>
+            <h3 class="text-secondary mb-md" style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.08em;">
+              🎤 RECORD FROM MICROPHONE
+            </h3>
+            <div class="recorder-controls">
+              <button class="record-button" id="recordBtn" title="Start/Stop Recording">
+                <span id="recordIcon">●</span>
+              </button>
+              <div class="recording-timer" id="recordTimer">00:00</div>
+              <div class="waveform-visualizer" id="waveform">
+                <canvas id="waveformCanvas" width="400" height="80"></canvas>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button class="btn btn-success" id="classifyRecordingBtn" disabled>
+                  <span>▶</span> CLASSIFY RECORDING
+                </button>
+                <button class="btn btn-danger" id="clearRecordingBtn" disabled>
+                  <span>🗑</span> DELETE
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS PANEL -->
+      <div class="panel results-panel" id="resultsPanel" style="display: none;">
+        <div class="panel-header">
+          <h2><span class="panel-icon">📊</span> CLASSIFICATION RESULTS</h2>
+        </div>
+        
+        <div class="result-main">
+          <div class="result-signal">
+            <div class="result-label">Detected Signal</div>
+            <div class="result-value" id="resultSignal">—</div>
+          </div>
+          <div class="result-confidence">
+            <div class="result-label">Confidence</div>
+            <div class="result-value" id="resultConfidence">—</div>
+            <div class="confidence-bar">
+              <div class="confidence-fill" id="confidenceFill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Grid (Additional Info) -->
+        <div class="status-grid">
+          <div class="status-item">
+            <div class="status-item-label">Processing Time</div>
+            <div class="status-item-value" id="processingTime">—</div>
+          </div>
+          <div class="status-item">
+            <div class="status-item-label">Audio Duration</div>
+            <div class="status-item-value" id="audioDuration">—</div>
+          </div>
+          <div class="status-item">
+            <div class="status-item-label">Sample Rate</div>
+            <div class="status-item-value" id="sampleRate">22.05 kHz</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOG TERMINAL -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2><span class="panel-icon">💻</span> SYSTEM LOG</h2>
+          <button class="btn btn-secondary" id="clearLogBtn" style="padding: 6px 12px; min-width: auto;">
+            CLEAR LOG
+          </button>
+        </div>
+        <div class="log-terminal" id="logTerminal">
+          <!-- Logs will be added here dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: TRAINING -->
+    <div id="page-training" class="page">
+      <div class="panel control-panel">
+        <div class="panel-header">
+          <h2><span class="panel-icon">🔧</span> MODEL TRAINING</h2>
+        </div>
+        
+        <div class="mb-lg">
+          <h3 class="text-secondary mb-md" style="font-size: 0.9rem;">TRAINING PIPELINE</h3>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button class="btn btn-primary" id="generateDataBtn">
+              <span>1️⃣</span> GENERATE TRAINING DATA
+            </button>
+            <button class="btn btn-primary" id="preprocessDataBtn" disabled>
+              <span>2️⃣</span> PREPROCESS FEATURES
+            </button>
+            <button class="btn btn-primary" id="trainModelBtn" disabled>
+              <span>3️⃣</span> TRAIN MODEL
+            </button>
+          </div>
+        </div>
+
+        <div class="status-grid">
+          <div class="status-item">
+            <div class="status-item-label">Training Samples</div>
+            <div class="status-item-value" id="trainingSamples">—</div>
+          </div>
+          <div class="status-item">
+            <div class="status-item-label">Model Accuracy</div>
+            <div class="status-item-value" id="modelAccuracy">—</div>
+          </div>
+          <div class="status-item">
+            <div class="status-item-label">Last Training</div>
+            <div class="status-item-value" id="lastTraining" style="font-size: 0.9rem;">Never</div>
+          </div>
+        </div>
+
+        <div class="mt-lg">
+          <div class="log-terminal" id="trainingLog" style="max-height: 300px;">
+            <div class="log-entry system">
+              <span class="timestamp">[SYSTEM]</span> Training pipeline ready. Start with data generation.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: SYSTEM INFO -->
+    <div id="page-system" class="page">
+      <div class="panel">
+        <div class="panel-header">
+          <h2><span class="panel-icon">ℹ️</span> SYSTEM INFORMATION</h2>
+        </div>
+        
+        <div class="status-grid">
+          <div class="status-item">
+            <div class="status-item-label">Model Version</div>
+            <div class="status-item-value" style="font-size: 1rem;">v2.4.1</div>
+          </div>
+          <div class="status-item">
+            <div class="status-item-label">Backend</div>
+            <div class="status-item-value" style="font-size: 1rem;">PyTorch</div>
+          </div>
+          <div class="status-item">
+            <div class="status-item-label">Classes</div>
+            <div class="status-item-value">13</div>
+          </div>
+        </div>
+
+        <h3 class="mt-lg mb-md text-secondary" style="font-size: 0.9rem;">COLREG SIGNAL CLASSES</h3>
+        <div class="log-terminal" style="max-height: 400px;">
+          <div class="log-entry"><strong>0.</strong> Alter Starboard (1 short blast)</div>
+          <div class="log-entry"><strong>1.</strong> Alter Port (2 short blasts)</div>
+          <div class="log-entry"><strong>2.</strong> Astern Propulsion (3 short blasts)</div>
+          <div class="log-entry"><strong>3.</strong> Danger Signal / Doubt (5+ short blasts)</div>
+          <div class="log-entry"><strong>4.</strong> Overtake Starboard (2 long + 1 short)</div>
+          <div class="log-entry"><strong>5.</strong> Round Starboard (5 short with pause)</div>
+          <div class="log-entry"><strong>6.</strong> Round Port (6 short with pause)</div>
+          <div class="log-entry"><strong>7.</strong> Blind Bend / Making Way (1 long blast)</div>
+          <div class="log-entry"><strong>8.</strong> Overtake Port (2 long + 2 short)</div>
+          <div class="log-entry"><strong>9.</strong> Agreement to Overtake (Long-Short-Long-Short)</div>
+          <div class="log-entry"><strong>10.</strong> Not Under Command (1 long + 2 short)</div>
+          <div class="log-entry"><strong>11.</strong> Noise Only (Background/silence)</div>
+          <div class="log-entry"><strong>12.</strong> Random Short Blasts (8+ random)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+      KONGSBERG MARITIME © 2025 :: COLREG SOUND SIGNAL CLASSIFIER v2.4.1<br>
+      GMDSS COMPLIANT :: ML-POWERED CLASSIFICATION SYSTEM :: AUTHORIZED PERSONNEL ONLY
+    </footer>
+
+  </div>
+
+  <!-- Load JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>
