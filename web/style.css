@@ -1045,3 +1045,33 @@ footer a:hover {
         width: 150px;
     }
 }
+
+.spectrogram-container {
+    width: 100%;
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    border: 1px solid var(--accent-gold);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    display: none; /* Hidden until file loaded */
+    background: #000;
+    box-shadow: 0 0 15px rgba(245, 192, 65, 0.1);
+}
+
+.preview-label {
+    background: rgba(245, 192, 65, 0.1);
+    color: var(--accent-gold);
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    border-bottom: 1px solid var(--accent-gold-soft);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.spectrogram-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+    /* Optional: Add a scanline effect to the image itself */
+    mix-blend-mode: screen;
+}

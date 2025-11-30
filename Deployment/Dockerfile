@@ -14,23 +14,27 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 WORKDIR /app
 
 # 4. Install Python Dependencies
-# FIX: Look inside 'Deployment/' folder
+# We copy from Deployment/ folder
 COPY Deployment/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 5. Copy Source Code
-# predictor.py is inside src/, so this single command copies everything we need
 COPY src/ src/
 
-# 6. Copy Pipeline Script
-# FIX: Look inside 'Deployment/' folder
+# 6. Copy Web Application
+# Copy the whole web folder (html, js, css)
+COPY web/ web/
+# Copy the server script to root for easy execution
+COPY web/api_server.py .
+
+# 7. Copy Pipeline Script
 COPY Deployment/train_pipeline.sh .
 
-# 7. Fix Permissions (Windows line endings)
+# 8. Fix Permissions
 RUN dos2unix train_pipeline.sh && chmod +x train_pipeline.sh
 
-# 8. Create Data Directories
-RUN mkdir -p /app/audio /app/models /app/dataset
+# 9. Create Data Directories
+RUN mkdir -p /app/audio /app/models /app/dataset /app/predictor_logs /app/temp_uploads
 
-# 9. Run
+# 10. Run Default Command
 ENTRYPOINT ["./train_pipeline.sh"]

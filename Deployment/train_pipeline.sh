@@ -9,6 +9,7 @@ echo "=========================================================="
 if [ -z "$(ls -A /app/audio/horns 2>/dev/null)" ]; then
     echo "❌ ERROR: No horn files found!"
     echo "   Please make sure you mount your local 'audio' folder to '/app/audio'"
+    echo "   Example: -v \"\$(pwd)/audio:/app/audio\""
     exit 1
 fi
 
@@ -40,6 +41,11 @@ python src/train_colreg_classifier.py
 
 # --- EXPORT ---
 echo "Saving final model..."
+# Ensure output directory exists (it should be mounted, but good to be safe)
+if [ ! -d "/app/models" ]; then
+    mkdir -p /app/models
+fi
+
 if [ -f "colreg_classifier_best.pth" ]; then
     cp colreg_classifier_best.pth /app/models/colreg_classifier_best.pth
     echo "✅  SUCCESS! Model saved to 'models/colreg_classifier_best.pth'"
