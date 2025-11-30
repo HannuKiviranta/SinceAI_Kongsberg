@@ -10,6 +10,11 @@ import time
 import subprocess
 from werkzeug.utils import secure_filename
 from datetime import datetime
+import matplotlib
+matplotlib.use('Agg')  # Must be BEFORE pyplot
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -140,10 +145,12 @@ def preprocess_audio(file_path):
             mels_db = mels_db[:, :MAX_WIDTH]
         
         tensor = torch.tensor(mels_db).float().unsqueeze(0).unsqueeze(0)
-        return tensor
+        
+        # Return both tensor and spectrogram
+        return tensor, mels_db
     except Exception as e:
         print(f"Error preprocessing: {e}")
-        return None
+        return None, None
 
 # --- API ENDPOINTS ---
 
@@ -160,6 +167,7 @@ def get_status():
         'model_path': MODEL_PATH
     })
 
+@app.route('/api/classify', methods=['POST'])
 @app.route('/api/classify', methods=['POST'])
 def classify_audio():
     """Classify uploaded audio"""
@@ -179,6 +187,7 @@ def classify_audio():
     if not allowed_file(file.filename):
         return jsonify({'error': 'Invalid file type. Only .wav files allowed'}), 400
     
+    filepath = None
     try:
         filename = secure_filename(file.filename)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
@@ -188,10 +197,9 @@ def classify_audio():
         y, sr = librosa.load(filepath, sr=SR)
         duration = len(y) / sr
         
-        # Preprocess
-        input_tensor = preprocess_audio(filepath)
+        # Preprocess - NOW RETURNS BOTH
+        input_tensor, mels_db = preprocess_audio(filepath)
         if input_tensor is None:
-            os.remove(filepath)
             return jsonify({'error': 'Failed to process audio'}), 400
         
         # Inference
@@ -207,8 +215,32 @@ def classify_audio():
         
         processing_time = time.time() - start_time
         
-        # Cleanup
-        os.remove(filepath)
+        # Create spectrogram visualization
+        fig, ax = plt.subplots(figsize=(10, 4))
+        img = ax.imshow(mels_db, aspect='auto', origin='lower', cmap='viridis')
+        ax.set_xlabel('Time Frames', color='white')
+        ax.set_ylabel('Mel Frequency Bands', color='white')
+        ax.set_title('Mel Spectrogram', color='#f5c041', fontsize=14, weight='bold')
+        
+        # Style to match UI
+        fig.patch.set_facecolor('#010711')
+        ax.set_facecolor('#010711')
+        ax.tick_params(colors='#7dd0ff')
+        for spine in ax.spines.values():
+            spine.set_color('#7dd0ff')
+        
+        # Colorbar
+        cbar = plt.colorbar(img, ax=ax)
+        cbar.set_label('Amplitude (dB)', color='white')
+        cbar.ax.yaxis.set_tick_params(color='#7dd0ff')
+        plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='#7dd0ff')
+        
+        # Convert to base64
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', facecolor='#010711', edgecolor='none', bbox_inches='tight')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+        plt.close(fig)
         
         return jsonify({
             'success': True,
@@ -216,6 +248,7 @@ def classify_audio():
             'confidence': round(confidence, 2),
             'processing_time': round(processing_time, 3),
             'audio_duration': round(duration, 2),
+            'spectrogram': f'data:image/png;base64,{image_base64}',
             'all_probabilities': {
                 COLREG_CLASSES[i]: round(probabilities[0][i].item() * 100, 2)
                 for i in range(len(COLREG_CLASSES))
@@ -223,9 +256,14 @@ def classify_audio():
         })
         
     except Exception as e:
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        print(f"ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+    
+    finally:
+        if filepath and os.path.exists(filepath):
+            os.remove(filepath)
 
 @app.route('/api/train/generate_clean', methods=['POST'])
 def generate_clean_data():

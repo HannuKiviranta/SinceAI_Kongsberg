@@ -58,12 +58,24 @@ function showResults(data) {
     document.getElementById('processingTime').textContent = `${data.processing_time}s`;
     document.getElementById('audioDuration').textContent = `${data.audio_duration}s`;
 
+    // Display spectrogram if available
+    if (data.spectrogram) {
+        const spectrogramContainer = document.getElementById('spectrogramContainer');
+        const spectrogramImage = document.getElementById('spectrogramImage');
+
+        spectrogramImage.src = data.spectrogram;
+        spectrogramContainer.style.display = 'block';
+
+        addLog('✓ Mel spectrogram generated', 'success');
+    }
+
     // Scroll to results
     resultsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function hideResults() {
     document.getElementById('resultsPanel').style.display = 'none';
+    document.getElementById('spectrogramContainer').style.display = 'none';
 }
 
 function updateSystemStatus(status, text) {
