@@ -26,8 +26,12 @@ The system processes audio in three distinct stages:
     
 3.  **Sequence Recognition (GRU):** A Recurrent Neural Network analyzes the timing and order of the blasts (e.g., "Short-Short-Short" vs "Long-Short") to classify the COLREG signal.
 
-### Workflow Diagram
-![Workflow Diagram](src/workflow_diagram.png)
+<!-- ### Workflow Diagram
+![Workflow Diagram](src/workflow_diagram.png) -->
+
+<p align="center">
+  <img src="src/workflow_diagram.png" alt="Workflow Diagram" width="12000">
+</p>
 
 ## 📋 Supported Classes (COLREGs)
 
@@ -44,8 +48,7 @@ The system processes audio in three distinct stages:
 | 8        | 2 Long, 2 Short      | I intend to overtake you on your port side.                  |
 | 9        | Long-Short-Long-Short              | Agreement to be overtaken.                                   |
 | 10       | 1 Long, 2 Short      | Not Under Command / Restricted Ability.                      |
-| 11       | (Silence)            | Background Noise Only.                                       |
-| 12       | 8+ Short             | Random Short Blasts / General Alarm.                         |
+| 11       | (Silence)            | Background Noise Only.                                                            |
 
 
 ## 📁 Project Structure
