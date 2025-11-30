@@ -13,25 +13,27 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 
 WORKDIR /app
 
-# 4. Install Python Dependencies
+# 4. Copy and Install Python Dependencies
 COPY Deployment/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Copy Source Code
+# 5. Copy Source Code and Web Interface
 COPY src/ src/
 COPY web/ web/
 
-# 6. Copy Pipeline Script
+# 6. Copy Scripts
 COPY Deployment/train_pipeline.sh .
+COPY Deployment/start_web.sh .
 
 # 7. Fix Permissions (Windows line endings)
-RUN dos2unix train_pipeline.sh && chmod +x train_pipeline.sh
+RUN dos2unix train_pipeline.sh && chmod +x train_pipeline.sh && \
+    dos2unix start_web.sh && chmod +x start_web.sh
 
 # 8. Create Required Directories
 RUN mkdir -p /app/audio /app/models /app/dataset /app/web/temp_uploads
 
-# 9. Expose Ports for Web Interface
+# 9. Expose Ports
 EXPOSE 5000 8000
 
-# 10. Default command - can be overridden
-ENTRYPOINT ["./train_pipeline.sh"]
+# 10. Default Command (Training Pipeline)
+CMD ["./train_pipeline.sh"]
