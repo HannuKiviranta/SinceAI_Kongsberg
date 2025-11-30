@@ -6,6 +6,5 @@ matplotlib
 flask
 flask-cors
 torch
-numpy
 scipy
 werkzeug
