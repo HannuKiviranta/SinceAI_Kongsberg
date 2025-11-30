@@ -26,12 +26,9 @@ The system processes audio in three distinct stages:
     
 3.  **Sequence Recognition (GRU):** A Recurrent Neural Network analyzes the timing and order of the blasts (e.g., "Short-Short-Short" vs "Long-Short") to classify the COLREG signal.
 
-<!-- ### Workflow Diagram
-![Workflow Diagram](src/workflow_diagram.png) -->
+### Workflow Diagram
+![Workflow Diagram](src/workflow_diagram.png)
 
-<p align="center">
-  <img src="src/workflow_diagram.png" alt="Workflow Diagram" width="12000">
-</p>
 
 ## 📋 Supported Classes (COLREGs)
 
