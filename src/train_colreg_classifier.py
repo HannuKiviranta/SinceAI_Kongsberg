@@ -10,7 +10,7 @@ import shutil
 
 # --- CONFIGURATION ---
 N_MELS = 128                   
-N_CLASSES = 13  # Must match the 13 classes defined in preprocess.py
+N_CLASSES = 12  # Must match the 13 classes defined in preprocess.py
 
 # --- DATASET DEFINITION ---
 class ColregDataset(Dataset):

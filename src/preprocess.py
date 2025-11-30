@@ -27,7 +27,6 @@ CLASS_MAP = {
     "Agreement_to_Overtake": 9,
     "Not_Under_Command": 10,    
     "Noise_Only": 11,           
-    "Random_Short_Blasts": 12   
 }
 
 FILE_SEGMENT_TO_CLASS = {
@@ -44,7 +43,6 @@ FILE_SEGMENT_TO_CLASS = {
     "blind_bend": "Blind_Bend_Making_Way", 
     "nuc": "Not_Under_Command",
     "no_signal": "Noise_Only",
-    "random_short": "Random_Short_Blasts",
 }
 
 def wav_to_spectrogram(file_path):

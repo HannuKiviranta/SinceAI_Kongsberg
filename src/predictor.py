@@ -6,6 +6,7 @@ import argparse
 import os
 import sys
 import datetime
+import glob
 
 # --- 1. CONFIGURATION ---
 N_MELS = 128
@@ -16,13 +17,16 @@ CLIP_DURATION_SEC = 20
 # Calculate width dynamically
 MAX_WIDTH = int(np.ceil(CLIP_DURATION_SEC * (SR / HOP_LENGTH)))
 
-MODEL_PATH = "colreg_classifier/colreg_classifier_best.pth"
+MODEL_PATH = "models/colreg_classifier_best.pth"
 
 # Log Configuration
 LOG_DIR = "predictor_logs"
 LOG_FILE = "prediction_log.txt" 
 
-# Class mapping (13 Classes)
+# Confidence Threshold (Below this % = Unknown)
+CONFIDENCE_THRESHOLD = 65.0 
+
+# Class mapping (12 Classes)
 COLREG_CLASSES = [
     "Alter Starboard",          # 0
     "Alter Port",               # 1
@@ -35,8 +39,7 @@ COLREG_CLASSES = [
     "Overtake Port",            # 8
     "Agreement to Overtake",    # 9
     "Not Under Command",        # 10
-    "Noise Only",               # 11
-    "Random Short Blasts"       # 12
+    "Noise Only"                # 11
 ]
 
 # --- 2. MODEL ARCHITECTURE ---
@@ -111,38 +114,60 @@ def preprocess_audio(file_path):
         tensor = torch.tensor(mels_db).float().unsqueeze(0).unsqueeze(0)
         return tensor
     except Exception as e:
-        print(f"Error processing audio file: {e}")
+        print(f"Error processing audio file {file_path}: {e}")
         return None
 
 def log_prediction(audio_file, predicted_class, confidence):
-    """Appends the prediction result to a log file in a specific folder."""
-    
-    # Ensure log directory exists
     if not os.path.exists(LOG_DIR):
-        try:
-            os.makedirs(LOG_DIR)
-        except OSError as e:
-            print(f"Warning: Could not create log directory {LOG_DIR}: {e}")
-            return
+        try: os.makedirs(LOG_DIR)
+        except OSError: pass
 
-    # Full path to the log file
     log_path = os.path.join(LOG_DIR, LOG_FILE)
-    
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[{timestamp}] File: {os.path.basename(audio_file)} | Prediction: {predicted_class} | Confidence: {confidence:.2f}%\n"
     
     try:
-        with open(log_path, "a") as f:
-            f.write(log_entry)
-        print(f"   [Log saved to {log_path}]")
-    except Exception as e:
-        print(f"Warning: Could not save log: {e}")
+        with open(log_path, "a") as f: f.write(log_entry)
+    except Exception: pass
+
+def predict_single_file(model, device, file_path):
+    if not os.path.exists(file_path):
+        print(f"Skipping: {file_path} (Not found)")
+        return
+
+    input_tensor = preprocess_audio(file_path)
+    if input_tensor is None: return
+
+    input_tensor = input_tensor.to(device)
+    
+    with torch.no_grad():
+        outputs = model(input_tensor)
+        probabilities = torch.nn.functional.softmax(outputs, dim=1)
+        score, predicted_idx = torch.max(probabilities, 1)
+        
+        confidence = score.item() * 100
+        
+        if confidence < CONFIDENCE_THRESHOLD:
+            predicted_class = "UNKNOWN / UNRECOGNIZED SIGNAL"
+            status = "IGNORED (Low Confidence)"
+        else:
+            predicted_class = COLREG_CLASSES[predicted_idx.item()]
+            status = "ACCEPTED"
+
+    log_prediction(file_path, predicted_class, confidence)
+
+    print("-" * 50)
+    print(f"File:       {os.path.basename(file_path)}")
+    print(f"Prediction: {predicted_class.upper()}")
+    print(f"Confidence: {confidence:.2f}%")
+    print(f"Status:     {status}")
 
 # --- 4. MAIN EXECUTION ---
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="COLREG Sound Signal Classifier")
-    parser.add_argument("--file", type=str, required=True, help="Path to the .wav file to test")
-    parser.add_argument("--model", type=str, default=MODEL_PATH, help="Path to .pth model file")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file", type=str, help="Path to a single .wav file")
+    parser.add_argument("--dir", type=str, help="Path to a folder containing .wav files")
+    parser.add_argument("--model", type=str, default=MODEL_PATH, help="Path to .pth model")
     args = parser.parse_args()
 
     if not os.path.exists(args.model):
@@ -150,6 +175,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Loading model on {device}...")
     
     try:
         model = ColregClassifier(num_classes=len(COLREG_CLASSES), input_height=N_MELS)
@@ -160,35 +186,36 @@ if __name__ == "__main__":
         print(f"Failed to load model: {e}")
         sys.exit(1)
 
-    if not os.path.exists(args.file):
-        print("ERROR: Audio file not found.")
-        sys.exit(1)
-
-    input_tensor = preprocess_audio(args.file)
+    # Check if user provided a directory or a single file
+    if args.dir:
+        if not os.path.exists(args.dir):
+            print(f"ERROR: Directory {args.dir} not found.")
+            sys.exit(1)
+            
+        files = glob.glob(os.path.join(args.dir, "*.wav"))
+        print(f"Found {len(files)} wav files in {args.dir}")
+        
+        for f in files:
+            predict_single_file(model, device, f)
+            
+    elif args.file:
+        predict_single_file(model, device, args.file)
     
-    if input_tensor is None:
-        sys.exit(1)
+    else:
+        # Default behavior: Look in the standard input folder if no args provided
+        default_input_dir = "/app/input" # Docker path
+        # Check if running locally or in docker to decide default
+        if not os.path.exists(default_input_dir) and os.path.exists("input_to_predict_COLREG"):
+             default_input_dir = "input_to_predict_COLREG"
+             
+        if os.path.exists(default_input_dir):
+            print(f"No arguments provided. Scanning default folder: {default_input_dir}")
+            files = glob.glob(os.path.join(default_input_dir, "*.wav"))
+            for f in files:
+                predict_single_file(model, device, f)
+        else:
+            print("Usage: python predictor.py --file <path> OR --dir <path>")
 
-    input_tensor = input_tensor.to(device)
-    
-    with torch.no_grad():
-        outputs = model(input_tensor)
-        probabilities = torch.nn.functional.softmax(outputs, dim=1)
-        score, predicted_idx = torch.max(probabilities, 1)
-        predicted_class = COLREG_CLASSES[predicted_idx.item()]
-        confidence = score.item() * 100
-
-    # Log result to Text File in the new folder
-    log_prediction(args.file, predicted_class, confidence)
-
-    print("\n" + "="*40)
-    print(f"PREDICTION RESULT")
-    print("="*40)
-    print(f"Detected Signal:  {predicted_class.upper()}")
-    print(f"Confidence:       {confidence:.2f}%")
-    print("-" * 40)
-    
-    if confidence < 70.0:
-        print("WARNING: Confidence is low. Result may be unreliable.")
-    
-    print("="*40 + "\n")
+    print("\n" + "="*50)
+    print(f"Done. Logs saved to {os.path.join(LOG_DIR, LOG_FILE)}")
+    print("="*50 + "\n")
