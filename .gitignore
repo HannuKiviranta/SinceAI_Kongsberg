@@ -37,3 +37,8 @@ pycache/
 If you build the image locally, you typically don't ignore Docker files,
 
 but you might ignore output log directories.
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
