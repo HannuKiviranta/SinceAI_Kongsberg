@@ -4,7 +4,17 @@ A robust, containerized Machine Learning system designed to detect and classify 
 
 This project uses a **Deep Learning (CNN + GRU)** architecture to identify critical navigation signals such as "Overtaking", "Altering Course", and "Not Under Command" directly from audio streams. It features an automated **Curriculum Learning** pipeline and a **web interface** for easy interaction.
 
-## 🌟 Key Features
+## Workflow Diagram
+
+![Workflow Diagram](src/workflow_diagram.png)
+
+## Team
+
+- Oleksandr Yakovlev
+- Hannu Kiviranta
+- Eduard Rednic
+
+## Key Features
 
 - **Web Interface:** Beautiful Fallout/Inmarsat-C styled terminal UI
 - **Curriculum Learning Pipeline:** Automatically trains on clean data first, then introduces realistic background noise
@@ -13,7 +23,7 @@ This project uses a **Deep Learning (CNN + GRU)** architecture to identify criti
 - **Dockerized Workflow:** Zero-dependency setup with single-command deployment
 - **Real-time Classification:** Upload files or record from microphone
 
-## 🧠 Technical Architecture
+## Technical Architecture
 
 The system processes audio in three distinct stages:
 
@@ -21,7 +31,7 @@ The system processes audio in three distinct stages:
 2. **Feature Extraction (CNN):** Identifies the "shape" of horn blasts
 3. **Sequence Recognition (GRU):** Analyzes timing and order of blasts
 
-## 📋 Supported Classes (COLREGs)
+## Supported Classes (COLREGs)
 
 | Class | Signal Pattern | Meaning (Rule 34/35) |
 |-------|----------------|----------------------|
@@ -64,7 +74,7 @@ SinceAI_Kongsberg/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 You have **two options** to run this project:
 
@@ -124,91 +134,16 @@ python -m http.server 8000
 
 ### Option B: Run with Docker (Recommended)
 
-#### **Prerequisites:**
-- Docker Desktop installed
-- NVIDIA GPU Drivers (optional, for faster training)
-
-#### **1. Build Docker Image:**
-
-**Windows:**
-```powershell
-docker build -t colreg-classifier -f Deployment/Dockerfile .
-```
-
-**Linux/Mac:**
-```bash
-docker build -t colreg-classifier -f Deployment/Dockerfile .
-```
-
-#### **2. Run Web Interface:**
-
-**Windows:**
-```powershell
-docker run --rm -p 5000:5000 -p 8000:8000 `
-  -v "${PWD}/audio:/app/audio" `
-  -v "${PWD}/models:/app/models" `
-  -v "${PWD}/dataset:/app/dataset" `
-  colreg-classifier `
-  ./start_web.sh
-```
-
-**Linux/Mac:**
-```bash
-docker run --rm -p 5000:5000 -p 8000:8000 \
-  -v "$(pwd)/audio:/app/audio" \
-  -v "$(pwd)/models:/app/models" \
-  -v "$(pwd)/dataset:/app/dataset" \
-  colreg-classifier \
-  ./start_web.sh
-```
-
-**Open browser:** `http://localhost:8000`
-
-#### **3. Run Training Pipeline (CLI Only):**
-
-**Windows:**
-```powershell
-docker run --rm --gpus all `
-  -v "${PWD}/audio:/app/audio" `
-  -v "${PWD}/models:/app/models" `
-  colreg-classifier
-```
-
-**Linux/Mac:**
-```bash
-docker run --rm --gpus all \
-  -v "$(pwd)/audio:/app/audio" \
-  -v "$(pwd)/models:/app/models" \
-  colreg-classifier
-```
-
-#### **4. Run Prediction:**
-
-**Windows:**
-```powershell
-docker run --rm `
-  -v "${PWD}/models:/app/models" `
-  -v "${PWD}/input_to_predict_COLREG:/app/input" `
-  -v "${PWD}/predictor_logs:/app/predictor_logs" `
-  --entrypoint python `
-  colreg-classifier `
-  src/predictor.py --file /app/input/test.wav
-```
-
-**Linux/Mac:**
-```bash
-docker run --rm \
-  -v "$(pwd)/models:/app/models" \
-  -v "$(pwd)/input_to_predict_COLREG:/app/input" \
-  -v "$(pwd)/predictor_logs:/app/predictor_logs" \
-  --entrypoint python \
-  colreg-classifier \
-  src/predictor.py --file /app/input/test.wav
-```
+See [Docker Deployment Guide](DOCKER_DEPLOY.md) for complete instructions on:
+- Building the Docker image
+- Training models
+- Running the web interface
+- Making predictions
+- Troubleshooting
 
 ---
 
-## 🎯 Using the Web Interface
+## Using the Web Interface
 
 1. **Open** `http://localhost:8000` in your browser
 2. **Go to TRAINING tab** and click **"🚀 RUN FULL PIPELINE"**
@@ -218,14 +153,14 @@ docker run --rm \
    - Record audio from your microphone
    - View real-time results with confidence scores
 
-## 📊 Performance
+## Performance
 
 - **Accuracy:** 70-95%+ on validation set
 - **Processing Time:** <2 seconds per file
 - **Noise Robustness:** Trained on wind, waves, thunder, rain, seagulls
 - **Classes:** 12 COLREG signal types
 
-## 🛠️ Development
+## Development
 
 ### Local Development Workflow:
 
@@ -239,22 +174,17 @@ docker run --rm \
 2. Rebuild image: `docker build -t colreg-classifier -f Deployment/Dockerfile .`
 3. Rerun container
 
-## 📜 Acknowledgments
+## Acknowledgments
 
 This project was developed as a solution for the **Turku Hackathon Challenge**, presented by **Kongsberg Maritime**. It aims to enhance maritime safety through AI-driven sound signal recognition.
 
 ## 📄 License
 
-Mit Licence
+MIT License
 
-## 👥 Team
-
-- Oleksandr Yakovlev
-- Hannu Kivirinta
-- Eduard Rednic
-
-## 🔗 Links
+## Links
 
 - **Demo:** [Live Demo URL]
-- **GitHub:** [Repository URL]
-- **Documentation:** [Docs URL]
+- **GitHub:** https://github.com/HannuKiviranta/SinceAI_Kongsberg
+
+---
