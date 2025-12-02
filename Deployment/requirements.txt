@@ -5,6 +5,5 @@ scikit-learn
 matplotlib
 flask
 flask-cors
-torch
 scipy
 werkzeug
