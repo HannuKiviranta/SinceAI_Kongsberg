@@ -13,29 +13,38 @@ if [ -z "$(ls -A /app/audio/horns 2>/dev/null)" ]; then
 fi
 
 # --- PHASE 1: CLEAN DATA ---
-echo "Step [1/5]: Generating CLEAN dataset (500 samples/class)..."
+echo "Step [1/7]: Generating CLEAN dataset (500 samples/class)."
 python src/data_gen.py --mode clean
 
-echo "Step [2/5]: Preprocessing CLEAN data..."
+echo "Step [2/7]: Preprocessing CLEAN data."
 python src/preprocess.py --source dataset/train/clean --label_file labels_clean.npy
 
 # --- PHASE 2: NOISY DATA ---
-# Check if background noise exists in the mounted volume before trying to generate noisy data
 if [ -d "/app/audio/noise/background_noise" ] && [ "$(ls -A /app/audio/noise/background_noise)" ]; then
-    echo "Step [3/5]: Generating NOISY dataset (500 samples/class)..."
+    echo "Step [3/7]: Generating NOISY dataset (500 samples/class)."
     python src/data_gen.py --mode noisy
 
-    echo "Step [4/5]: Preprocessing NOISY data..."
+    echo "Step [4/7]: Preprocessing NOISY data."
     python src/preprocess.py --source dataset/train/noisy --label_file labels_noisy.npy
 else
     echo "⚠️  WARNING: No background noise found in /app/audio/noise/background_noise"
     echo "   Skipping Noisy Phase generation. Training will be Clean-only."
 fi
 
-# --- PHASE 3: TRAINING ---
-echo "Step [5/5]: Starting Curriculum Training (Clean -> Noisy)..."
-# This script automatically handles loading labels_clean.npy first,
-# then fine-tuning on labels_noisy.npy if it exists.
+# --- PHASE 3: SEAGULL NOISE DATA (optional) ---
+if [ -d "/app/audio/noise/seagulls" ] && [ "$(ls -A /app/audio/noise/seagulls)" ]; then
+    echo "Step [5/7]: Generating SEAGULL dataset (reduced samples/class)."
+    python src/data_gen.py --mode seagulls
+
+    echo "Step [6/7]: Preprocessing SEAGULL data."
+    python src/preprocess.py --source dataset/train/seagulls --label_file labels_seagulls.npy
+else
+    echo "⚠️  WARNING: No seagull noise found in /app/audio/noise/seagulls"
+    echo "   Skipping Seagull fine-tuning phase."
+fi
+
+# --- PHASE 4: TRAINING ---
+echo "Step [7/7]: Starting Curriculum Training (Clean -> Noisy -> Seagulls)..."
 python src/train_colreg_classifier.py
 
 # --- EXPORT ---

@@ -301,12 +301,30 @@ def generate_noisy_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/train/generate_seagulls', methods=['POST'])
+def generate_seagull_data():
+    """Generate seagull-noise training data"""
+    try:
+        result = subprocess.run(
+            ['python', 'src/data_gen.py', '--mode', 'seagulls'],
+            capture_output=True,
+            text=True,
+            timeout=600
+        )
+        return jsonify({
+            'success': result.returncode == 0,
+            'output': result.stdout,
+            'error': result.stderr if result.returncode != 0 else None
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/train/full_pipeline', methods=['POST'])
 def run_full_pipeline():
     """Run complete training pipeline (Clean + Noisy + Train)"""
     try:
         # Step 1: Generate Clean
-        print("Step 1/5: Generating clean data...")
+        print("Step 1/7: Generating clean data...")
         result1 = subprocess.run(
             ['python', 'src/data_gen.py', '--mode', 'clean'],
             capture_output=True,
@@ -322,7 +340,7 @@ def run_full_pipeline():
             }), 500
         
         # Step 2: Preprocess Clean
-        print("Step 2/5: Preprocessing clean data...")
+        print("Step 2/7: Preprocessing clean data...")
         result2 = subprocess.run(
             ['python', 'src/preprocess.py', '--source', 'dataset/train/clean', '--label_file', 'labels_clean.npy'],
             capture_output=True,
@@ -338,7 +356,7 @@ def run_full_pipeline():
             }), 500
         
         # Step 3: Generate Noisy
-        print("Step 3/5: Generating noisy data...")
+        print("Step 3/7: Generating noisy data...")
         result3 = subprocess.run(
             ['python', 'src/data_gen.py', '--mode', 'noisy'],
             capture_output=True,
@@ -354,7 +372,7 @@ def run_full_pipeline():
             }), 500
         
         # Step 4: Preprocess Noisy
-        print("Step 4/5: Preprocessing noisy data...")
+        print("Step 4/7: Preprocessing noisy data...")
         result4 = subprocess.run(
             ['python', 'src/preprocess.py', '--source', 'dataset/train/noisy', '--label_file', 'labels_noisy.npy'],
             capture_output=True,
@@ -369,14 +387,41 @@ def run_full_pipeline():
                 'output': result4.stderr
             }), 500
         
+                # Step 5: Generate Seagull Noisy
+        print("Step 5/7: Generating seagull-noise data.")
+        result5 = subprocess.run(
+            ['python', 'src/data_gen.py', '--mode', 'seagulls'],
+            capture_output=True,
+            text=True,
+            timeout=600
+        )
+
+        if result5.returncode != 0:
+            print("⚠️ Seagull data generation failed, continuing without seagull phase.")
+            result5 = None  # don't hard fail
+
+        # Step 6: Preprocess Seagull (only if generation worked)
+        if result5 and result5.returncode == 0:
+            print("Step 6/7: Preprocessing seagull data.")
+            result6 = subprocess.run(
+                ['python', 'src/preprocess.py', '--source', 'dataset/train/seagulls', '--label_file', 'labels_seagulls.npy'],
+                capture_output=True,
+                text=True,
+                timeout=600
+            )
+
+            if result6.returncode != 0:
+                print("⚠️ Seagull preprocessing failed, continuing without seagull phase.")
+
         # Step 5: Train Model
-        print("Step 5/5: Training model (this may take 10-30 minutes)...")
+        print("Step 7/7: Training model (this may take 10-30 minutes)...")
         result5 = subprocess.run(
             ['python', 'src/train_colreg_classifier.py'],
             capture_output=True,
             text=True,
             timeout=3600
         )
+        
         
         if result5.returncode == 0:
             # Reload model

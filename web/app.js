@@ -435,8 +435,10 @@ function setupTrainingControls() {
     document.getElementById('runFullPipelineBtn').addEventListener('click', runFullPipeline);
     document.getElementById('generateCleanBtn').addEventListener('click', generateCleanData);
     document.getElementById('generateNoisyBtn').addEventListener('click', generateNoisyData);
+    document.getElementById('generateSeagullBtn').addEventListener('click', generateSeagullData);
     document.getElementById('trainModelBtn').addEventListener('click', trainModel);
 }
+
 
 async function runFullPipeline() {
     addTrainingLog('=== STARTING FULL TRAINING PIPELINE ===', 'warning');
@@ -534,6 +536,35 @@ async function generateNoisyData() {
 
         if (data.success) {
             addTrainingLog('✓ Noisy data generation complete!', 'success');
+            if (data.output) {
+                data.output.split('\n').forEach(line => {
+                    if (line.trim()) addTrainingLog(line, 'info');
+                });
+            }
+        } else {
+            addTrainingLog(`ERROR: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        addTrainingLog(`ERROR: ${error.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function generateSeagullData() {
+    addTrainingLog('Generating seagull-noise training data.', 'warning');
+    const btn = document.getElementById('generateSeagullBtn');
+    btn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/train/generate_seagulls`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            addTrainingLog('✓ Seagull data generation complete!', 'success');
             if (data.output) {
                 data.output.split('\n').forEach(line => {
                     if (line.trim()) addTrainingLog(line, 'info');

@@ -20,14 +20,20 @@ N_CLASSES = 12  # Must match the classes defined in preprocess.py
 # ============================================================
 
 # Phase 1: Clean Training
-CLEAN_EPOCHS = 40          # 🔧 Increased from 30
+CLEAN_EPOCHS = 2          # 
 CLEAN_LR = 0.001           # Learning rate for clean phase
 CLEAN_BATCH_SIZE = 32
 
 # Phase 2: Noisy Fine-tuning
-NOISY_EPOCHS = 30          # 🔧 Increased from 20
+NOISY_EPOCHS = 2          # 
 NOISY_LR = 0.0001          # Lower LR to not break clean learning
 NOISY_BATCH_SIZE = 32
+
+# Phase 3: Seagull Fine-tuning (optional)
+SEAGULL_EPOCHS = 2        # Smaller, just fine-tune a bit
+SEAGULL_LR = 0.00005      # Even lower LR
+SEAGULL_BATCH_SIZE = 32
+
 
 # Regularization
 DROPOUT_CNN = 0.4          # Dropout after CNN layers
@@ -268,6 +274,7 @@ if __name__ == '__main__':
     print(f"\nConfiguration:")
     print(f"  Clean Phase: {CLEAN_EPOCHS} epochs @ LR={CLEAN_LR}")
     print(f"  Noisy Phase: {NOISY_EPOCHS} epochs @ LR={NOISY_LR}")
+    print(f"  Seagull Phase: {SEAGULL_EPOCHS} epochs @ LR={SEAGULL_LR}")
     print(f"  CNN Dropout: {DROPOUT_CNN}")
     print(f"  FC Dropout: {DROPOUT_FC}")
     print(f"  Early Stop Patience: {EARLY_STOP_PATIENCE}")
@@ -276,6 +283,7 @@ if __name__ == '__main__':
     DATA_DIR = "dataset/" 
     LABELS_CLEAN = os.path.join(DATA_DIR, "labels_clean.npy")
     LABELS_NOISY = os.path.join(DATA_DIR, "labels_noisy.npy")
+    LABELS_SEAGULLS = os.path.join(DATA_DIR, "labels_seagulls.npy")
     
     MODEL_CLEAN = "colreg_model_clean.pth"
     MODEL_FINAL = "colreg_classifier_best.pth"
@@ -312,6 +320,18 @@ if __name__ == '__main__':
         load_path=MODEL_CLEAN
     )
     
+      # --- PHASE 3: SEAGULL FINE-TUNING (optional) ---
+    success_seagulls = run_training_phase(
+        phase_name="Seagulls",
+        labels_file=LABELS_SEAGULLS,
+        model=model,
+        num_epochs=SEAGULL_EPOCHS,
+        lr=SEAGULL_LR,
+        batch_size=SEAGULL_BATCH_SIZE,
+        save_path=MODEL_FINAL,      # keep saving to the same final model
+        load_path=MODEL_FINAL       # start from the already fine-tuned noisy model
+    )
+
     # Fallback Logic
     if not success_noisy:
         if success_clean:

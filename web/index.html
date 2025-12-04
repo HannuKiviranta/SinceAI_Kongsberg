@@ -178,23 +178,34 @@
         <div class="mb-lg">
           <h3 class="text-secondary mb-md" style="font-size: 0.9rem;">AUTOMATED TRAINING WORKFLOW</h3>
           <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
-            The system uses Curriculum Learning: Clean data first (Phase 1), then Noisy data (Phase 2) for real-world robustness.
+            Curriculum Learning pipeline:
+            Clean data (Phase 1) → Noisy data (Phase 2) → Seagull-noise fine-tuning (Phase 3)
+            for real-world robustness and maritime accuracy.
           </p>
+
           <div style="display: flex; gap: 12px; flex-wrap: wrap;">
             <button class="btn btn-primary" id="runFullPipelineBtn">
               <span>🚀</span> RUN FULL PIPELINE
             </button>
+
             <button class="btn btn-secondary" id="generateCleanBtn">
               <span>1️⃣</span> GENERATE CLEAN DATA
             </button>
+
             <button class="btn btn-secondary" id="generateNoisyBtn">
               <span>2️⃣</span> GENERATE NOISY DATA
             </button>
+
+            <!-- NEW BUTTON -->
+            <button class="btn btn-secondary" id="generateSeagullBtn">
+              <span>2️⃣b</span> GENERATE SEAGULL DATA
+            </button>
+
             <button class="btn btn-secondary" id="trainModelBtn">
               <span>3️⃣</span> TRAIN MODEL
             </button>
           </div>
-        </div>
+
 
         <div class="status-grid">
           <div class="status-item">

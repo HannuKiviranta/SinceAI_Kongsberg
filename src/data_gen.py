@@ -19,13 +19,15 @@ HORNS_DIR = "audio/horns"
 # Noise Configuration
 NOISE_CATEGORIES = {
     "Backgrounds": "audio/noise/background_noise",
+    "Seagulls": "audio/noise/seagulls",
 }
+
 
 # ============================================================
 # KEY TRAINING PARAMETERS - ADJUST THESE
 # ============================================================
 
-SAMPLES_PER_CLASS = 1000  # 🔧 Increased from 2 for real training
+SAMPLES_PER_CLASS = 5  
 
 # Timing Configuration (in seconds)
 RANGE_INTERVAL = (0.8, 1.2)   # 🔧 Gap between consecutive blasts (was 0.7-1.0)
@@ -266,39 +268,43 @@ def generate_sample(filename, pattern_def, bg_noise, horns_lib, use_noise=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=['clean', 'noisy'], required=True)
+    parser.add_argument("--mode", choices=["clean", "noisy", "seagulls"], required=True)
     args = parser.parse_args()
-    
-    USE_NOISE = (args.mode == 'noisy')
+
+    USE_NOISE = (args.mode != "clean")
     OUTPUT_DIR = os.path.join(OUTPUT_DIR_BASE, args.mode)
-    if not os.path.exists(OUTPUT_DIR): 
-        os.makedirs(OUTPUT_DIR)
-    
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
     try:
         # 1. Load Master Horns
         horns_lib = load_asset_library(HORNS_DIR)
-        if not horns_lib: 
+        if not horns_lib:
             raise ValueError(f"No .wav files found in {HORNS_DIR}.")
-        
         print(f"✓ Loaded {len(horns_lib)} horn file(s)")
-        
+
         bg_lib = []
         if USE_NOISE:
-            print("🔊 NOISE MODE: ON (Loading backgrounds...)")
-            bg_path = NOISE_CATEGORIES.get("Backgrounds")
-            
+            if args.mode == "noisy":
+                print("🔊 NOISE MODE: ON (Loading background noise...)")
+                noise_key = "Backgrounds"
+            else:  # "seagulls"
+                print("🕊 NOISE MODE: ON (Loading seagull noise...)")
+                noise_key = "Seagulls"
+
+            bg_path = NOISE_CATEGORIES.get(noise_key)
+
             if bg_path and os.path.exists(bg_path):
                 bg_lib = load_asset_library(bg_path, duration=60)
-            
+
             if not bg_lib:
-                print("WARNING: No backgrounds found! Reverting to Clean mode.")
+                print("WARNING: No noise clips found! Reverting to Clean mode.")
                 USE_NOISE = False
             else:
-                print(f"✓ Loaded {len(bg_lib)} background file(s)")
+                print(f"✓ Loaded {len(bg_lib)} noise file(s)")
                 print(f"  SNR range: {SNR_MIN_DB}dB to {SNR_MAX_DB}dB")
         else:
             print("🔇 NOISE MODE: OFF (Generating clean signals)")
-            
+
     except Exception as e:
         print(f"Fatal Error: {e}")
         exit(1)
