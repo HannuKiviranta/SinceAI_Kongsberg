@@ -20,12 +20,12 @@ N_CLASSES = 12  # Must match the classes defined in preprocess.py
 # ============================================================
 
 # Phase 1: Clean Training
-CLEAN_EPOCHS = 40          # 🔧 Increased from 30
+CLEAN_EPOCHS = 2          # 🔧 Increased from 30
 CLEAN_LR = 0.001           # Learning rate for clean phase
 CLEAN_BATCH_SIZE = 32
 
 # Phase 2: Noisy Fine-tuning
-NOISY_EPOCHS = 30          # 🔧 Increased from 20
+NOISY_EPOCHS = 2          # 🔧 Increased from 20
 NOISY_LR = 0.0001          # Lower LR to not break clean learning
 NOISY_BATCH_SIZE = 32
 

@@ -25,7 +25,7 @@ NOISE_CATEGORIES = {
 # KEY TRAINING PARAMETERS - ADJUST THESE
 # ============================================================
 
-SAMPLES_PER_CLASS = 1000  # 🔧 Increased from 2 for real training
+SAMPLES_PER_CLASS = 20  # 🔧 Increased from 2 for real training
 
 # Timing Configuration (in seconds)
 RANGE_INTERVAL = (0.8, 1.2)   # 🔧 Gap between consecutive blasts (was 0.7-1.0)
