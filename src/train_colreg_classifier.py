@@ -20,17 +20,17 @@ N_CLASSES = 12  # Must match the classes defined in preprocess.py
 # ============================================================
 
 # Phase 1: Clean Training
-CLEAN_EPOCHS = 2          # 
+CLEAN_EPOCHS = 10          # 
 CLEAN_LR = 0.001           # Learning rate for clean phase
 CLEAN_BATCH_SIZE = 32
 
 # Phase 2: Noisy Fine-tuning
-NOISY_EPOCHS = 2          # 
+NOISY_EPOCHS = 10          # 
 NOISY_LR = 0.0001          # Lower LR to not break clean learning
 NOISY_BATCH_SIZE = 32
 
 # Phase 3: Seagull Fine-tuning (optional)
-SEAGULL_EPOCHS = 2        # Smaller, just fine-tune a bit
+SEAGULL_EPOCHS = 10        # Smaller, just fine-tune a bit
 SEAGULL_LR = 0.00005      # Even lower LR
 SEAGULL_BATCH_SIZE = 32
 
