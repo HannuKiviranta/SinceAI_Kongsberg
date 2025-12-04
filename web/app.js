@@ -407,6 +407,7 @@ function clearRecording() {
 
 function setupNavigation() {
     const navTabs = document.querySelectorAll('.nav-tab');
+    const pages = document.querySelectorAll('.page');
 
     navTabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -416,11 +417,12 @@ function setupNavigation() {
             navTabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
 
-            // Show target page
-            document.querySelectorAll('.page').forEach(page => {
-                page.style.display = 'none';
-            });
-            document.getElementById(`page-${targetPage}`).style.display = 'block';
+            // Switch visible page via .active class
+            pages.forEach(p => p.classList.remove('active'));
+            const target = document.getElementById(`page-${targetPage}`);
+            if (target) {
+                target.classList.add('active');
+            }
 
             addLog(`→ Switched to ${targetPage.toUpperCase()} module`, 'system');
         });
@@ -685,6 +687,24 @@ function initialize() {
     // Check system status
     setTimeout(checkSystemStatus, 500);
 }
+
+// TAB SWITCHING (Classifier / Training / System Info)
+document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        const page = tab.getAttribute('data-page');
+
+        // Hide all pages
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+        // Show selected page
+        const target = document.getElementById(`page-${page}`);
+        if (target) target.classList.add('active');
+
+        // Update tabs
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+    });
+});
 
 // Start application when DOM is ready
 document.addEventListener('DOMContentLoaded', initialize);
