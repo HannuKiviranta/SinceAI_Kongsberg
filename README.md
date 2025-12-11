@@ -180,7 +180,7 @@ This project was developed as a solution for the **Turku Hackathon Challenge**, 
 
 ## 📄 License
 
-MIT License
+- MIT License
 
 ## Links
 
