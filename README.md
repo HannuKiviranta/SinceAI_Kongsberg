@@ -5,6 +5,15 @@ A robust, containerized Machine Learning system designed to detect and classify 
 
 This project uses a **Deep Learning (CNN + GRU)** architecture to identify critical navigation signals such as "Overtaking", "Altering Course", and "Not Under Command" directly from audio streams. It features an automated **Curriculum Learning** pipeline that trains on clean synthetic data before fine-tunes on noisy environments (wind, waves, engine noise) for real-world reliability.
 
+## 👨‍💻 Team & Contributors
+This project was built by the SinceAI team for the Turku Hackathon.
+- Hannu Kiviranta - https://www.linkedin.com/in/hannu-kiviranta-12865739a/
+
+- Eduard Rednic - https://www.linkedin.com/in/eduardrednic/
+
+- Oleksandr Yakovlev - https://www.linkedin.com/in/oleksandr-yakovlev-student/
+
+
 ## 🌟 Key Features
 
 -   **Curriculum Learning Pipeline:** Automatically trains on clean data first to learn signal patterns, then introduces realistic background noise to improve robustness.
@@ -106,3 +115,4 @@ For specific commands for **Windows**, **Mac**, and **Linux**, please read the d
 ## 📜 Acknowledgments
 
 This project was developed as a solution for the Turku Hackathon Challenge, presented by Kongsberg Maritime. It aims to enhance maritime safety through AI-driven sound signal recognition.
+
