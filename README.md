@@ -94,21 +94,27 @@ For specific commands for **Windows**, **Mac**, and **Linux**, please read the d
     
     ```
     docker build -t colreg-classifier -f Deployment/Dockerfile .
-    
     ```
     
 2.  **Train Model:**
     
     ```
-    docker run --rm --gpus all -v ... colreg-classifier
-    
+    docker run --rm --gpus all `
+    -v "${PWD}/audio:/app/audio" `
+    -v "${PWD}/models:/app/models" `
+    colreg-classifier
     ```
     
 3.  **Predict Signal:**
     
     ```
-    docker run --rm ... --entrypoint python colreg-classifier src/predictor.py ...
-    
+    docker run --rm `
+    -v "${PWD}/models:/app/models" `
+    -v "${PWD}/input_to_predict_COLREG:/app/input" `
+    -v "${PWD}/predictor_logs:/app/predictor_logs" `
+    --entrypoint python `
+    colreg-classifier `
+    src/predictor.py --file /app/input/recording.wav --model /app/models/colreg_classifier_best.pth
     ```
     
 
