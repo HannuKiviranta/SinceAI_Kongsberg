@@ -14,7 +14,7 @@ This project was built by the SinceAI team for the Turku Hackathon.
 - Oleksandr Yakovlev - https://www.linkedin.com/in/oleksandr-yakovlev-student/
 
 
-## 🌟 Key Features
+## Key Features
 
 -   **Curriculum Learning Pipeline:** Automatically trains on clean data first to learn signal patterns, then introduces realistic background noise to improve robustness.
     
@@ -25,7 +25,7 @@ This project was built by the SinceAI team for the Turku Hackathon.
 -   **Dockerized Workflow:** Zero-dependency setup. A single command generates data, trains the model, and outputs a production-ready classifier.
     
 
-## 🧠 Technical Architecture
+## Technical Architecture
 
 The system processes audio in three distinct stages:
 
@@ -38,7 +38,7 @@ The system processes audio in three distinct stages:
 ### Workflow Diagram
 ![Workflow Diagram](src/workflow_diagram.png)
 
-## 📋 Supported Classes (COLREGs)
+## Supported Classes (COLREGs)
 
 | Class ID | Signal Pattern      | Meaning (Rule 34/35)                                         |
 |----------|----------------------|---------------------------------------------------------------|
@@ -57,7 +57,7 @@ The system processes audio in three distinct stages:
 | 12       | 8+ Short             | Random Short Blasts / General Alarm.                         |
 
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 .
@@ -80,11 +80,11 @@ The system processes audio in three distinct stages:
 
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 This project is designed to run entirely within Docker.
 
-### 📘 Detailed Instructions
+### Detailed Instructions
 
 For specific commands for **Windows**, **Mac**, and **Linux**, please read the dedicated guide: 👉 [**Deployment/docker_instruction.md**](https://github.com/HannuKiviranta/SinceAI_Kongsberg/blob/main/Deployment/docker_instruction.md)
 
